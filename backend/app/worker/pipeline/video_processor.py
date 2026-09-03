@@ -1,7 +1,7 @@
 import logging
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional
 
 import cv2
 import numpy as np
@@ -29,7 +29,7 @@ class ProcessingResult:
 def process_video(
     input_path: str,
     output_path: str,
-    progress_cb: Optional[Callable[[int, int], None]] = None,
+    progress_cb: Callable[[int, int], None] | None = None,
 ) -> ProcessingResult:
     cap = cv2.VideoCapture(input_path)
     if not cap.isOpened():
@@ -41,7 +41,7 @@ def process_video(
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or None
 
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-    fourcc = cv2.VideoWriter_fourcc(*settings.output_fourcc)
+    fourcc = cv2.VideoWriter_fourcc(*settings.output_fourcc)  # type: ignore[attr-defined]
     writer = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
 
     geometry = SceneGeometry(w, h)
@@ -72,7 +72,10 @@ def process_video(
             last_anomaly_frame = frame_idx
 
         _draw_overlay(
-            frame, geometry, tracks, counter.count,
+            frame,
+            geometry,
+            tracks,
+            counter.count,
             recent_anomaly=(frame_idx - last_anomaly_frame) < _ACTIVE_ANOMALY_BANNER_FRAMES,
             anomaly_text=monitor.anomalies[-1].message if monitor.anomalies else None,
         )
@@ -88,8 +91,11 @@ def process_video(
     elapsed = time.time() - t0
     log.info(
         "Processed %s frames in %.1fs (%.1f fps) - %d bags counted, %d anomalies",
-        frame_idx, elapsed, frame_idx / elapsed if elapsed else 0,
-        counter.count, len(monitor.anomalies),
+        frame_idx,
+        elapsed,
+        frame_idx / elapsed if elapsed else 0,
+        counter.count,
+        len(monitor.anomalies),
     )
 
     return ProcessingResult(
@@ -109,12 +115,18 @@ def _draw_overlay(frame, geometry: SceneGeometry, tracks, count, recent_anomaly,
     for t in tracks:
         if not t.confirmed:
             continue
-        x1, y1, x2, y2 = [int(v) for v in t.bbox]
+        x1, y1, x2, y2 = (int(v) for v in t.bbox)
         color = (0, 200, 0) if t.counted else (0, 165, 255)
         cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
         cv2.putText(
-            frame, f"#{t.track_id}", (x1, max(0, y1 - 6)),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2, cv2.LINE_AA,
+            frame,
+            f"#{t.track_id}",
+            (x1, max(0, y1 - 6)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            color,
+            2,
+            cv2.LINE_AA,
         )
         if settings.draw_trails and len(t.history) > 1:
             pts = np.array(t.history, dtype=np.int32)
@@ -132,8 +144,14 @@ def _draw_counter_badge(frame, count: int):
     pad = 10
     cv2.rectangle(frame, (10, 10), (10 + tw + 2 * pad, 10 + th + 2 * pad), (30, 30, 30), -1)
     cv2.putText(
-        frame, text, (10 + pad, 10 + th + pad // 2),
-        cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2, cv2.LINE_AA,
+        frame,
+        text,
+        (10 + pad, 10 + th + pad // 2),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.9,
+        (255, 255, 255),
+        2,
+        cv2.LINE_AA,
     )
 
 
@@ -142,6 +160,12 @@ def _draw_anomaly_banner(frame, text: str):
     banner_h = 30
     cv2.rectangle(frame, (0, h - banner_h), (w, h), (0, 0, 180), -1)
     cv2.putText(
-        frame, f"ANOMALY: {text[:90]}", (8, h - 9),
-        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA,
+        frame,
+        f"ANOMALY: {text[:90]}",
+        (8, h - 9),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.5,
+        (255, 255, 255),
+        1,
+        cv2.LINE_AA,
     )
