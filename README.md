@@ -28,20 +28,20 @@ Via the API (curl):
 
 ```bash
 # 1. upload the video
-curl -F "file=@input.mp4" http://localhost:8000/api/videos
+curl -F "file=@input.mp4" http://localhost:8000/api/v1/videos
 # -> {"id": "<job_id>", "status": "queued"}
 
 # 2. start processing (does not block the request)
-curl -X POST http://localhost:8000/api/videos/<job_id>/process
+curl -X POST http://localhost:8000/api/v1/videos/<job_id>/process
 
 # 3. poll status
-curl http://localhost:8000/api/videos/<job_id>
+curl http://localhost:8000/api/v1/videos/<job_id>
 
 # 4. download the result once status == "done"
-curl -OJ http://localhost:8000/api/videos/<job_id>/result
+curl -OJ http://localhost:8000/api/v1/videos/<job_id>/result
 
 # 5. list anomalies
-curl http://localhost:8000/api/videos/<job_id>/anomalies
+curl http://localhost:8000/api/v1/videos/<job_id>/anomalies
 ```
 
 All uploaded and processed videos, as well as the job database (SQLite), are
@@ -132,16 +132,16 @@ toward the camera) and are resolution-independent — see `SceneGeometry` in
 
 ### Asynchronous Processing
 
-`POST /api/videos` only saves the file and creates a `Job(status=queued)`
+`POST /api/v1/videos` only saves the file and creates a `Job(status=queued)`
 record — this is fast regardless of video length. `POST
-/api/videos/{id}/process` puts the job on the Redis queue (`rq.Queue.enqueue`)
+/api/v1/videos/{id}/process` puts the job on the Redis queue (`rq.Queue.enqueue`)
 and returns immediately: the HTTP request itself never waits for inference to
 finish. The actual processing (reading the video, per-frame detection,
 tracking, writing the output video) runs in a separate `rq worker` process,
 which writes progress (`processed_frames`, `progress_pct`) to the DB every 10
 frames — so the frontend can poll status without long-running requests. If a
 job fails (`try/except` in `worker/tasks.py`), the status becomes `failed`
-with the error text available via `GET /api/videos/{id}`.
+with the error text available via `GET /api/v1/videos/{id}`.
 
 ### Anomaly Monitoring
 
@@ -160,7 +160,7 @@ any general video-quality issue) — implemented in
 
 Each anomaly is a `{frame, timestamp_sec, type, severity, message}` record,
 written to the `Job.anomalies` JSON column (see `models.py`) and served via
-`GET /api/videos/{id}/anomalies`. The most recent active anomaly is also
+`GET /api/v1/videos/{id}/anomalies`. The most recent active anomaly is also
 drawn as a red banner at the bottom of the frame in the output video
 (`_draw_anomaly_banner` in `video_processor.py`), so it's visible directly
 while watching the result, not only in the log.
@@ -205,25 +205,59 @@ change `./data` to the desired path in `docker-compose.yml`.
 ```
 backend/
   app/
-    api/routes_videos.py        # HTTP endpoints
+    api/routes_videos.py         # HTTP endpoints (thin: parse request -> VideoService -> HTTP response)
+    services/
+      video_service.py           # use-case orchestration for the API (upload / start / status / result)
+      storage.py                 # StorageService: upload/result file paths on disk
+    repositories/
+      job_repository.py          # JobRepository: the only module that queries the Job table
     worker/
-      queue.py                  # RQ queue connection
-      tasks.py                  # rq task run_job(job_id)
-      pipeline/
-        detector.py              # MMDetection wrapper (+ motion-based fallback)
-        tracker.py                # SORT-lite tracker
-        roi.py                     # ROI polygon / counting line
-        counter.py                  # line-crossing counting logic
-        anomaly.py                   # anomaly monitoring
-        video_processor.py            # pipeline glue + frame rendering
+      queue.py                   # TaskQueue: RQ connection + enqueue
+      tasks.py                   # RQ entrypoint (dotted-path adapter, see file docstring)
+      job_runner.py               # JobRunner: orchestrates one job (status transitions + pipeline call)
+      pipeline/                   # pure CV pipeline, no DB/HTTP/queue knowledge
+        detector.py                # MMDetection wrapper (+ motion-based MockDetector fallback)
+        tracker.py                  # SORT-lite tracker
+        roi.py                       # ROI polygon / counting line geometry
+        counter.py                    # line-crossing counting logic
+        anomaly.py                     # anomaly monitoring
+        video_processor.py              # pipeline glue + frame rendering
     models.py / schemas.py / db.py / config.py / main.py
     static/index.html            # minimal UI
-  Dockerfile
-  requirements.txt
+  requirements/
+    base.txt                     # FastAPI/RQ/SQLModel core - always installed
+    cv.txt                       # opencv/numpy/scipy - always installed (tracker/roi/counter/anomaly need these, not MMDetection)
+    ml.txt                       # pinned version record for the MMDetection/torch stack (installed via `mim` in Dockerfile, not pip -r)
+    dev.txt                      # ruff/mypy/pytest/pre-commit - dev & CI only, never in the runtime image
+  tests/
+    unit/                        # pure-logic tests: roi/counter/tracker/anomaly, no Docker/Redis/MMDetection needed
+    integration/                 # API tests against the FastAPI app with a fake VideoService/queue
+  Dockerfile                     # single image for api+worker; ARG SKIP_ML_STACK for a lite/CI build
+  pyproject.toml                 # ruff + mypy + pytest config
 docker-compose.yml
+docker-compose.ci.yml            # lite-image override used by CI (see .github/workflows/ci.yml)
 .env.example
+docs/API_CONTRACTS.md            # versioned REST contract, error shape, compatibility policy
+CONTRIBUTING.md                  # branching model, commit convention, how to open a PR
+ROADMAP.md                       # backlog, meant to be mirrored 1:1 into GitHub Issues (see scripts/create_issues.sh)
 data/                            # bind-mount volume (empty in the repository)
 ```
+
+## Development Tooling
+
+* **Lint / format**: [ruff](https://docs.astral.sh/ruff/) (`make lint`, `make format`). Config in `backend/pyproject.toml`.
+* **Types**: mypy in non-strict-but-real mode (`make typecheck`) - see `[tool.mypy]` in `pyproject.toml` for what's excluded and why (mainly the untyped `mmdet`/`cv2` stubs).
+* **Tests**: pytest (`make test`). Unit tests never require Docker, Redis, or the MMDetection weights - they run against `tracker/roi/counter/anomaly` directly and against the API with `VideoService`/`TaskQueue` faked out.
+* **Pre-commit**: `pre-commit install` runs ruff (lint+format) and a requirements-sync check on every commit; the same checks run in CI so a bypassed hook still gets caught.
+* **Lite Docker image**: `docker build --build-arg SKIP_ML_STACK=true backend` skips the torch/MMDetection install entirely (`BagDetector` becomes unavailable, `MockDetector` is used automatically, see `app/worker/pipeline/detector.py::build_detector`). This is what CI builds; the default (`SKIP_ML_STACK=false`, i.e. plain `docker compose up --build`) always includes the full ML stack.
+
+## API Contracts
+
+The full REST contract (resources, request/response schemas, status codes, the versioning and backward-compatibility policy) is specified in [`docs/API_CONTRACTS.md`](docs/API_CONTRACTS.md) and enforced at runtime by the Pydantic models in `app/schemas.py`. The live interactive contract is always at `/docs` (Swagger) / `/openapi.json`. All endpoints are versioned under `/api/v1`.
+
+## Contributing / Branching Model
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the `main` / `dev` / `feature/*` branching model, commit conventions, and how PRs are expected to flow. Planned follow-up work is tracked in [`ROADMAP.md`](ROADMAP.md), mirrored into GitHub Issues.
 
 ## Known Limitations / Further Improvements
 
