@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Подсчёт мешков на конвейере</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; color: #222; }
+  h1 { font-size: 1.4rem; }
+  .card { border: 1px solid #ddd; border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+  button { background: #2563eb; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-size: 0.95rem; }
+  button:disabled { background: #93c5fd; cursor: not-allowed; }
+  progress { width: 100%; height: 18px; }
+  #log { font-family: monospace; font-size: 0.85rem; white-space: pre-wrap; background: #f7f7f7; padding: 10px; border-radius: 6px; max-height: 240px; overflow-y: auto; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.8rem; color: white; }
+  .queued { background: #6b7280; } .processing { background: #d97706; }
+  .done { background: #16a34a; } .failed { background: #dc2626; }
+  a.download { display: inline-block; margin-top: 8px; }
+</style>
+</head>
+<body>
+  <h1>Подсчёт мешков на конвейере</h1>
+
+  <div class="card">
+    <input type="file" id="file" accept="video/*"/>
+    <button id="uploadBtn">Загрузить и обработать</button>
+  </div>
+
+  <div class="card" id="statusCard" style="display:none">
+    <div>Job: <code id="jobId"></code> <span class="badge" id="statusBadge"></span></div>
+    <progress id="progress" value="0" max="100"></progress>
+    <div id="progressText"></div>
+    <div id="resultArea"></div>
+  </div>
+
+  <div class="card">
+    <h3>Лог аномалий</h3>
+    <div id="log">—</div>
+  </div>
+
+<script>
+const API = "/api/videos";
+let pollTimer = null;
+
+document.getElementById("uploadBtn").onclick = async () => {
+  const f = document.getElementById("file").files[0];
+  if (!f) { alert("Выберите видео"); return; }
+  const btn = document.getElementById("uploadBtn");
+  btn.disabled = true;
+
+  const fd = new FormData();
+  fd.append("file", f);
+  const up = await fetch(API, { method: "POST", body: fd }).then(r => r.json());
+
+  await fetch(`${API}/${up.id}/process`, { method: "POST" });
+
+  document.getElementById("statusCard").style.display = "block";
+  document.getElementById("jobId").textContent = up.id;
+  poll(up.id);
+  btn.disabled = false;
+};
+
+function badgeClass(status) { return status; }
+
+async function poll(id) {
+  clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    const s = await fetch(`${API}/${id}`).then(r => r.json());
+    document.getElementById("statusBadge").textContent = s.status;
+    document.getElementById("statusBadge").className = "badge " + badgeClass(s.status);
+    document.getElementById("progress").value = s.progress_pct;
+    document.getElementById("progressText").textContent =
+      `${s.processed_frames} / ${s.total_frames ?? "?"} кадров — мешков посчитано: ${s.bag_count} — аномалий: ${s.anomalies_count}`;
+
+    if (s.status === "done") {
+      clearInterval(pollTimer);
+      document.getElementById("resultArea").innerHTML =
+        `<a class="download" href="${API}/${id}/result">Скачать обработанное видео</a>`;
+      loadAnomalies(id);
+    }
+    if (s.status === "failed") {
+      clearInterval(pollTimer);
+      document.getElementById("resultArea").textContent = "Ошибка: " + s.error;
+    }
+  }, 1500);
+}
+
+async function loadAnomalies(id) {
+  const data = await fetch(`${API}/${id}/anomalies`).then(r => r.json());
+  const log = document.getElementById("log");
+  if (!data.anomalies.length) { log.textContent = "Аномалий не обнаружено."; return; }
+  log.textContent = data.anomalies
+    .map(a => `[${a.timestamp_sec.toFixed(1)}s] (${a.severity}) ${a.type}: ${a.message}`)
+    .join("\n");
+}
+</script>
+</body>
+</html>

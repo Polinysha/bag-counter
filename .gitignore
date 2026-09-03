@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+data/
+!data/.gitkeep
+*.mp4
+!README_assets/
+.DS_Store
