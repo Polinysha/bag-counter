@@ -26,9 +26,9 @@ Each anomaly is a small dict so it serializes directly into the Job's
 JSON column and the API response, and is cheap to overlay on the
 output video.
 """
+
 from collections import deque
-from dataclasses import dataclass, field
-from typing import List, Optional
+from dataclasses import dataclass
 
 from app.config import settings
 from app.worker.pipeline.roi import SceneGeometry
@@ -57,19 +57,19 @@ class AnomalyMonitor:
     def __init__(self, fps: float, geometry: SceneGeometry):
         self.fps = fps or 25.0
         self.geometry = geometry
-        self.anomalies: List[Anomaly] = []
+        self.anomalies: list[Anomaly] = []
 
         self._frames_since_any_detection = 0
         self._has_seen_detection_ever = False
         self._stall_flagged = False
 
         self._median_area_window: deque = deque(maxlen=50)
-        self._last_crossing_frame: Optional[int] = None
+        self._last_crossing_frame: int | None = None
 
         self._confidence_window: deque = deque(maxlen=settings.anomaly_low_confidence_window)
         self._low_conf_flagged_until = -1
 
-        self._seen_track_ids = set()
+        self._seen_track_ids: set[int] = set()
 
     def _ts(self, frame_idx: int) -> float:
         return frame_idx / self.fps
@@ -77,7 +77,9 @@ class AnomalyMonitor:
     def _add(self, frame_idx: int, type_: str, severity: str, message: str) -> None:
         self.anomalies.append(Anomaly(frame_idx, self._ts(frame_idx), type_, severity, message))
 
-    def observe_frame(self, frame_idx: int, tracks: List[Track], detections_this_frame: int) -> None:
+    def observe_frame(
+        self, frame_idx: int, tracks: list[Track], detections_this_frame: int
+    ) -> None:
         # -- stall detection -------------------------------------------------
         if detections_this_frame > 0:
             self._has_seen_detection_ever = True
@@ -92,7 +94,9 @@ class AnomalyMonitor:
                 and self._frames_since_any_detection >= stall_frames
             ):
                 self._add(
-                    frame_idx, "stall", "warning",
+                    frame_idx,
+                    "stall",
+                    "warning",
                     f"No bags detected in ROI for over {settings.anomaly_stall_seconds:.0f}s "
                     f"- conveyor may have stopped or the camera view is obstructed.",
                 )
@@ -104,9 +108,14 @@ class AnomalyMonitor:
                 self._confidence_window.append(t.score)
         if len(self._confidence_window) == self._confidence_window.maxlen:
             avg_conf = sum(self._confidence_window) / len(self._confidence_window)
-            if avg_conf < settings.anomaly_low_confidence_thr and frame_idx - self._low_conf_flagged_until > self._confidence_window.maxlen:
+            if (
+                avg_conf < settings.anomaly_low_confidence_thr
+                and frame_idx - self._low_conf_flagged_until > self._confidence_window.maxlen
+            ):
                 self._add(
-                    frame_idx, "low_confidence", "info",
+                    frame_idx,
+                    "low_confidence",
+                    "info",
                     f"Average detector confidence dropped to {avg_conf:.2f} over the last "
                     f"{self._confidence_window.maxlen} frames - counts in this window are less certain.",
                 )
@@ -122,7 +131,9 @@ class AnomalyMonitor:
                 )
                 if dist < 0.15 * max(self.geometry.w, self.geometry.h):
                     self._add(
-                        frame_idx, "lost_near_line", "warning",
+                        frame_idx,
+                        "lost_near_line",
+                        "warning",
                         f"Track #{t.track_id} disappeared near the counting line without being "
                         f"confirmed as counted - a bag may have been missed.",
                     )
@@ -135,7 +146,9 @@ class AnomalyMonitor:
             median = sorted_areas[len(sorted_areas) // 2]
             if median > 0 and abs(area - median) / median > settings.anomaly_size_deviation:
                 self._add(
-                    frame_idx, "unusual_size", "warning",
+                    frame_idx,
+                    "unusual_size",
+                    "warning",
                     f"Bag #{track_id} crossed the line with an area {area:.0f}px "
                     f"far from the recent median ({median:.0f}px) - possibly two bags "
                     f"merged into one detection, or a false positive.",
@@ -147,18 +160,21 @@ class AnomalyMonitor:
             gap_sec = (frame_idx - self._last_crossing_frame) / self.fps
             if gap_sec < settings.anomaly_double_count_seconds:
                 self._add(
-                    frame_idx, "possible_double_count", "critical",
+                    frame_idx,
+                    "possible_double_count",
+                    "critical",
                     f"Bag #{track_id} crossed only {gap_sec:.2f}s after the previous one - "
                     f"check for a tracker ID switch or a bag that split into two detections.",
                 )
         self._last_crossing_frame = frame_idx
 
-    def to_list(self) -> List[dict]:
+    def to_list(self) -> list[dict]:
         return [a.to_dict() for a in self.anomalies]
 
 
 def _point_to_segment_distance(p, a, b) -> float:
     import math
+
     px, py = p
     ax, ay = a
     bx, by = b
