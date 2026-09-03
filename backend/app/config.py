@@ -2,7 +2,9 @@
 Central configuration. All values can be overridden via environment
 variables (see .env.example in the repo root / docker-compose.yml).
 """
+
 from pathlib import Path
+
 from pydantic_settings import BaseSettings
 
 
@@ -23,9 +25,7 @@ class Settings(BaseSettings):
     # RTMDet-tiny is small & fast enough for CPU-only demo boxes.
     # baked into the docker image at build time via `mim download`
     # (see backend/Dockerfile) - no network access needed at runtime.
-    mmdet_config: str = (
-        "/opt/mmdetection/configs/rtmdet/rtmdet_tiny_8xb32-300e_coco.py"
-    )
+    mmdet_config: str = "/opt/mmdetection/configs/rtmdet/rtmdet_tiny_8xb32-300e_coco.py"
     mmdet_checkpoint: str = (
         "/opt/mmdetection/configs/rtmdet/"
         "rtmdet_tiny_8xb32-300e_coco_20220902_112414-78e30dcc.pth"
@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     # class-agnostic: an object is treated as a "bag candidate" if its
     # detected box center falls inside the conveyor ROI, regardless of
     # the COCO label the detector assigned it (see README for why).
-    min_box_area_ratio: float = 0.002   # relative to frame area
+    min_box_area_ratio: float = 0.002  # relative to frame area
     max_box_area_ratio: float = 0.35
 
     # --- ROI / counting line --------------------------------------------
@@ -44,8 +44,12 @@ class Settings(BaseSettings):
     # (belt runs diagonally from the far/top opening towards the
     # camera / bottom-left where bags drop onto the pile).
     roi_polygon: list = [
-        [0.359, 0.028], [0.672, 0.042], [0.531, 0.833],
-        [0.0, 1.0], [0.0, 0.833], [0.234, 0.556],
+        [0.359, 0.028],
+        [0.672, 0.042],
+        [0.531, 0.833],
+        [0.0, 1.0],
+        [0.0, 0.833],
+        [0.234, 0.556],
     ]
     counting_line: list = [[0.169, 0.506], [0.469, 0.356]]  # [ [x1,y1], [x2,y2] ]
     # direction, in pixels, that counts as "a bag left the belt":
@@ -54,12 +58,12 @@ class Settings(BaseSettings):
 
     # --- tracking --------------------------------------------------------
     tracker_iou_threshold: float = 0.25
-    tracker_max_age: int = 15          # frames a track may go unmatched
-    tracker_min_hits: int = 2          # frames before a track is confirmed
+    tracker_max_age: int = 15  # frames a track may go unmatched
+    tracker_min_hits: int = 2  # frames before a track is confirmed
 
     # --- anomaly monitoring ----------------------------------------------
     anomaly_stall_seconds: float = 8.0
-    anomaly_size_deviation: float = 0.6       # relative to running median
+    anomaly_size_deviation: float = 0.6  # relative to running median
     anomaly_double_count_seconds: float = 0.6
     anomaly_low_confidence_window: int = 30
     anomaly_low_confidence_thr: float = 0.30

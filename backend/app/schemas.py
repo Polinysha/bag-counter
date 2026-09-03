@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, List
+
 from pydantic import BaseModel
 
 from app.models import JobStatus
@@ -21,14 +21,14 @@ class AnomalyOut(BaseModel):
 class JobStatusResponse(BaseModel):
     id: str
     status: JobStatus
-    error: Optional[str] = None
+    error: str | None = None
     original_filename: str
     created_at: datetime
-    started_at: Optional[datetime] = None
-    finished_at: Optional[datetime] = None
-    total_frames: Optional[int] = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    total_frames: int | None = None
     processed_frames: int
-    fps: Optional[float] = None
+    fps: float | None = None
     progress_pct: float
     bag_count: int
     anomalies_count: int
@@ -57,4 +57,4 @@ class JobStatusResponse(BaseModel):
 class JobAnomaliesResponse(BaseModel):
     id: str
     bag_count: int
-    anomalies: List[AnomalyOut]
+    anomalies: list[AnomalyOut]

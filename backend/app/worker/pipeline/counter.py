@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import List
 
 from app.worker.pipeline.roi import SceneGeometry
 from app.worker.pipeline.tracker import Track
@@ -27,8 +26,8 @@ class BagCounter:
         self.geometry = geometry
         self.count = 0
 
-    def process(self, tracks: List[Track], frame_idx: int) -> List[CrossingEvent]:
-        events: List[CrossingEvent] = []
+    def process(self, tracks: list[Track], frame_idx: int) -> list[CrossingEvent]:
+        events: list[CrossingEvent] = []
         for t in tracks:
             if not t.confirmed or t.counted:
                 continue

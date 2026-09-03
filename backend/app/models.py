@@ -1,10 +1,9 @@
 import enum
 import uuid
 from datetime import datetime
-from typing import Optional, List
 
-from sqlalchemy import Column, JSON
-from sqlmodel import SQLModel, Field
+from sqlalchemy import JSON, Column
+from sqlmodel import Field, SQLModel
 
 
 class JobStatus(str, enum.Enum):
@@ -18,19 +17,19 @@ class Job(SQLModel, table=True):
     id: str = Field(default_factory=lambda: uuid.uuid4().hex, primary_key=True)
 
     status: JobStatus = Field(default=JobStatus.queued)
-    error: Optional[str] = None
+    error: str | None = None
 
     original_filename: str
     input_path: str
-    output_path: Optional[str] = None
+    output_path: str | None = None
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    started_at: Optional[datetime] = None
-    finished_at: Optional[datetime] = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
 
-    total_frames: Optional[int] = None
+    total_frames: int | None = None
     processed_frames: int = 0
-    fps: Optional[float] = None
+    fps: float | None = None
 
     bag_count: int = 0
 
@@ -38,4 +37,4 @@ class Job(SQLModel, table=True):
     progress_pct: float = 0.0
 
     # list[dict] of anomaly events, see worker/pipeline/anomaly.py
-    anomalies: List[dict] = Field(default_factory=list, sa_column=Column(JSON))
+    anomalies: list[dict] = Field(default_factory=list, sa_column=Column(JSON))
