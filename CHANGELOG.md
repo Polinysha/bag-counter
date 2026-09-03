@@ -19,5 +19,29 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 ### Changed
 - `main.py` moved from `@app.on_event("startup")` to a `lifespan` context manager.
 
+## [Unreleased] - production hardening
+
+### Added
+- `GET /api/health` now actually checks SQLite and Redis connectivity
+  (`app/health.py`) and returns `503` with a `checks` breakdown when
+  either is down, instead of unconditionally returning `200 {"status":
+  "ok"}`.
+- Upload size cap: `BC_MAX_UPLOAD_MB` (default 2048). Oversized uploads
+  are rejected with `413` while streaming (not after being fully
+  written to disk) and the `Job` is recorded as `failed` rather than
+  silently dropped - see `StorageService.save_upload` /
+  `VideoService.upload`.
+- Frontend (`app/static/index.html`): every API call now goes through
+  a wrapper that surfaces network/HTTP errors as a visible banner
+  instead of throwing an uncaught rejection; status polling stops
+  after repeated consecutive failures instead of polling forever
+  against a dead server.
+- `JobRepositoryProtocol` / `StorageServiceProtocol` / `TaskQueueProtocol`
+  in `app/services/video_service.py` - `VideoService` now depends on
+  structural types, so unit tests use plain in-memory fakes without
+  subclassing the real repository/storage/queue classes.
+- Unit tests: `tests/unit/test_storage.py` (upload size cap),
+  `tests/unit/test_video_service.py` (orchestration logic).
+
 ## [1.0.0]
 - Initial version: FastAPI + RQ/Redis + SQLite + MMDetection conveyor bag counter.

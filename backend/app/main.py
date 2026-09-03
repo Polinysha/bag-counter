@@ -3,10 +3,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes_videos import router as videos_router
 from app.db import init_db
+from app.health import check_db, check_redis
 
 logging.basicConfig(level=logging.INFO)
 
@@ -37,10 +39,22 @@ app.add_middleware(
 
 
 @app.get("/api/health", tags=["meta"])
-def health() -> dict:
-    """Liveness/readiness probe. Deliberately outside /api/v1: a health
-    check is infrastructure, not part of the versioned business API."""
-    return {"status": "ok"}
+def health() -> JSONResponse:
+    """
+    Liveness/readiness probe. Deliberately outside /api/v1: a health
+    check is infrastructure, not part of the versioned business API.
+
+    Actually checks the two things this service can't function without
+    (SQLite file + Redis) rather than always returning "ok" - an
+    orchestrator routing traffic based on this needs to know when the
+    process is up but its dependencies aren't.
+    """
+    checks = {"db": check_db(), "redis": check_redis()}
+    healthy = all(checks.values())
+    return JSONResponse(
+        status_code=200 if healthy else 503,
+        content={"status": "ok" if healthy else "degraded", "checks": checks},
+    )
 
 
 app.include_router(videos_router, prefix=API_V1_PREFIX)

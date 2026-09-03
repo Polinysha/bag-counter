@@ -15,10 +15,17 @@
   .queued { background: #6b7280; } .processing { background: #d97706; }
   .done { background: #16a34a; } .failed { background: #dc2626; }
   a.download { display: inline-block; margin-top: 8px; }
+  .error-banner {
+    display: none; background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c;
+    padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem;
+  }
+  .error-banner.visible { display: block; }
 </style>
 </head>
 <body>
   <h1>Подсчёт мешков на конвейере</h1>
+
+  <div class="error-banner" id="errorBanner"></div>
 
   <div class="card">
     <input type="file" id="file" accept="video/*"/>
@@ -40,31 +47,91 @@
 <script>
 const API = "/api/v1/videos";
 let pollTimer = null;
+// after this many consecutive failed polls, stop and surface an error -
+// a single blip (e.g. one dropped request) shouldn't kill the whole
+// progress view, but a server that's genuinely down should.
+const MAX_CONSECUTIVE_POLL_FAILURES = 4;
+let consecutivePollFailures = 0;
+
+function showError(message) {
+  const banner = document.getElementById("errorBanner");
+  banner.textContent = message;
+  banner.classList.add("visible");
+}
+
+function clearError() {
+  const banner = document.getElementById("errorBanner");
+  banner.classList.remove("visible");
+  banner.textContent = "";
+}
+
+// Wraps fetch with: network-error handling (fetch() itself only rejects
+// on network failure, not on 4xx/5xx) and non-OK-status handling, so
+// every call site below gets a real Error instead of silently getting
+// back an error-shaped JSON body or an uncaught rejection.
+async function apiFetch(url, options) {
+  let response;
+  try {
+    response = await fetch(url, options);
+  } catch (networkErr) {
+    throw new Error("Не удалось связаться с сервером. Проверьте соединение и повторите попытку.");
+  }
+  if (!response.ok) {
+    let detail = `Ошибка сервера (HTTP ${response.status})`;
+    try {
+      const body = await response.json();
+      if (body && body.detail) detail = body.detail;
+    } catch { /* body wasn't JSON - keep the generic message above */ }
+    throw new Error(detail);
+  }
+  return response.json();
+}
 
 document.getElementById("uploadBtn").onclick = async () => {
   const f = document.getElementById("file").files[0];
-  if (!f) { alert("Выберите видео"); return; }
+  if (!f) { showError("Выберите видео перед загрузкой."); return; }
+  clearError();
+
   const btn = document.getElementById("uploadBtn");
   btn.disabled = true;
+  try {
+    const fd = new FormData();
+    fd.append("file", f);
+    const up = await apiFetch(API, { method: "POST", body: fd });
+    await apiFetch(`${API}/${up.id}/process`, { method: "POST" });
 
-  const fd = new FormData();
-  fd.append("file", f);
-  const up = await fetch(API, { method: "POST", body: fd }).then(r => r.json());
-
-  await fetch(`${API}/${up.id}/process`, { method: "POST" });
-
-  document.getElementById("statusCard").style.display = "block";
-  document.getElementById("jobId").textContent = up.id;
-  poll(up.id);
-  btn.disabled = false;
+    document.getElementById("statusCard").style.display = "block";
+    document.getElementById("jobId").textContent = up.id;
+    document.getElementById("resultArea").innerHTML = "";
+    document.getElementById("log").textContent = "—";
+    poll(up.id);
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    btn.disabled = false;
+  }
 };
 
 function badgeClass(status) { return status; }
 
 async function poll(id) {
   clearInterval(pollTimer);
+  consecutivePollFailures = 0;
+
   pollTimer = setInterval(async () => {
-    const s = await fetch(`${API}/${id}`).then(r => r.json());
+    let s;
+    try {
+      s = await apiFetch(`${API}/${id}`);
+      consecutivePollFailures = 0;
+    } catch (err) {
+      consecutivePollFailures += 1;
+      if (consecutivePollFailures >= MAX_CONSECUTIVE_POLL_FAILURES) {
+        clearInterval(pollTimer);
+        showError(`Потеряна связь с сервером при отслеживании задачи: ${err.message}`);
+      }
+      return;
+    }
+
     document.getElementById("statusBadge").textContent = s.status;
     document.getElementById("statusBadge").className = "badge " + badgeClass(s.status);
     document.getElementById("progress").value = s.progress_pct;
@@ -79,13 +146,19 @@ async function poll(id) {
     }
     if (s.status === "failed") {
       clearInterval(pollTimer);
-      document.getElementById("resultArea").textContent = "Ошибка: " + s.error;
+      document.getElementById("resultArea").textContent = "Ошибка обработки: " + (s.error ?? "неизвестная ошибка");
     }
   }, 1500);
 }
 
 async function loadAnomalies(id) {
-  const data = await fetch(`${API}/${id}/anomalies`).then(r => r.json());
+  let data;
+  try {
+    data = await apiFetch(`${API}/${id}/anomalies`);
+  } catch (err) {
+    document.getElementById("log").textContent = "Не удалось загрузить список аномалий: " + err.message;
+    return;
+  }
   const log = document.getElementById("log");
   if (!data.anomalies.length) { log.textContent = "Аномалий не обнаружено."; return; }
   log.textContent = data.anomalies
