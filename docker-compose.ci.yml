@@ -1,0 +1,15 @@
+# Override used by CI (.github/workflows/ci.yml) and by `make lite-image`:
+# builds the "lite" image (no torch/MMDetection, see backend/Dockerfile
+# ARG SKIP_ML_STACK) so lint/type-check/unit-test jobs don't pay for a
+# multi-GB ML dependency install on every push.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.ci.yml build
+services:
+  api:
+    build:
+      args:
+        SKIP_ML_STACK: "true"
+  worker:
+    build:
+      args:
+        SKIP_ML_STACK: "true"

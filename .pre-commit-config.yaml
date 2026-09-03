@@ -1,0 +1,17 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.5.5
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^backend/
+      - id: ruff-format
+        files: ^backend/
+  - repo: local
+    hooks:
+      - id: requirements-sync
+        name: dev.txt includes base.txt + cv.txt
+        entry: bash -c 'grep -q "\-r base.txt" backend/requirements/dev.txt && grep -q "\-r cv.txt" backend/requirements/dev.txt'
+        language: system
+        pass_filenames: false
+        files: ^backend/requirements/

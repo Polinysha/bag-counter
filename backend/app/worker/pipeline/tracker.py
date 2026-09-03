@@ -8,8 +8,8 @@ deployment while still giving each bag a stable ID across frames -
 the ID is what protects the counter from double-counting the same
 bag on consecutive frames.
 """
+
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
 
 import numpy as np
 from scipy.optimize import linear_sum_assignment
@@ -18,7 +18,7 @@ from app.config import settings
 from app.worker.pipeline.detector import Detection
 
 
-def iou(a: Tuple[float, float, float, float], b: Tuple[float, float, float, float]) -> float:
+def iou(a: tuple[float, float, float, float], b: tuple[float, float, float, float]) -> float:
     ax1, ay1, ax2, ay2 = a
     bx1, by1, bx2, by2 = b
     ix1, iy1 = max(ax1, bx1), max(ay1, by1)
@@ -36,16 +36,16 @@ def iou(a: Tuple[float, float, float, float], b: Tuple[float, float, float, floa
 @dataclass
 class Track:
     track_id: int
-    bbox: Tuple[float, float, float, float]
+    bbox: tuple[float, float, float, float]
     score: float
-    velocity: Tuple[float, float] = (0.0, 0.0)
+    velocity: tuple[float, float] = (0.0, 0.0)
     hits: int = 1
     age: int = 0
     time_since_update: int = 0
     confirmed: bool = False
     counted: bool = False
-    history: List[Tuple[float, float]] = field(default_factory=list)  # centroids
-    areas: List[float] = field(default_factory=list)
+    history: list[tuple[float, float]] = field(default_factory=list)  # centroids
+    areas: list[float] = field(default_factory=list)
 
     @property
     def cx(self) -> float:
@@ -55,7 +55,7 @@ class Track:
     def cy(self) -> float:
         return (self.bbox[1] + self.bbox[3]) / 2
 
-    def predicted_bbox(self) -> Tuple[float, float, float, float]:
+    def predicted_bbox(self) -> tuple[float, float, float, float]:
         vx, vy = self.velocity
         x1, y1, x2, y2 = self.bbox
         return (x1 + vx, y1 + vy, x2 + vx, y2 + vy)
@@ -88,14 +88,14 @@ class Track:
 class BagTracker:
     def __init__(self):
         self._next_id = 1
-        self.tracks: List[Track] = []
+        self.tracks: list[Track] = []
 
     def _new_id(self) -> int:
         tid = self._next_id
         self._next_id += 1
         return tid
 
-    def update(self, detections: List[Detection]) -> List[Track]:
+    def update(self, detections: list[Detection]) -> list[Track]:
         for t in self.tracks:
             t.age += 1
 
@@ -108,7 +108,7 @@ class BagTracker:
             row_ind, col_ind = linear_sum_assignment(cost)
 
             matched_tracks, matched_dets = set(), set()
-            for r, c in zip(row_ind, col_ind):
+            for r, c in zip(row_ind, col_ind, strict=False):
                 if cost[r, c] <= (1.0 - settings.tracker_iou_threshold):
                     self.tracks[r].update(detections[c])
                     matched_tracks.add(r)
@@ -129,7 +129,5 @@ class BagTracker:
             new_track.areas.append(d.area)
             self.tracks.append(new_track)
 
-        self.tracks = [
-            t for t in self.tracks if t.time_since_update <= settings.tracker_max_age
-        ]
+        self.tracks = [t for t in self.tracks if t.time_since_update <= settings.tracker_max_age]
         return self.tracks

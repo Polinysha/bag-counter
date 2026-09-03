@@ -1,0 +1,55 @@
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+exclude = ["app/static"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",   # pycodestyle / pyflakes
+    "I",             # isort
+    "B",             # flake8-bugbear
+    "UP",            # pyupgrade
+    "SIM",           # flake8-simplify
+    "C4",            # flake8-comprehensions
+]
+ignore = [
+    "E501",  # line length is handled by the formatter, not the linter
+    "B008",  # FastAPI's `Depends(...)` in a default arg is the documented,
+             # intended pattern (see fastapi.tiangolo.com/tutorial/dependencies),
+             # not the "mutable default" bug bugbear is warning about.
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.10"
+files = ["app"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+disallow_untyped_defs = false   # tightened incrementally, see ROADMAP.md "Typing hardening"
+check_untyped_defs = true
+
+# Heavy CV/ML deps ship no (or incomplete) type stubs; asking mypy to
+# resolve them would either need `types-*` packages that don't exist
+# or `--ignore-missing-imports` globally, which hides real errors
+# everywhere else. Scoping the ignore to just these modules is the
+# deliberate tradeoff.
+[[tool.mypy.overrides]]
+module = ["cv2.*", "mmdet.*", "mmengine.*", "mmcv.*", "scipy.*", "rq.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "integration: exercises the FastAPI app / DB, slower than unit tests",
+]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/static/*"]

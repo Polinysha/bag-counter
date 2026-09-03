@@ -1,4 +1,5 @@
-from sqlmodel import SQLModel, create_engine, Session
+from sqlmodel import Session, SQLModel, create_engine
+
 from app.config import settings
 
 engine = create_engine(
@@ -9,6 +10,7 @@ engine = create_engine(
 
 def init_db() -> None:
     from app import models  # noqa: F401  (register tables)
+
     SQLModel.metadata.create_all(engine)
 
 

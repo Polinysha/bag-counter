@@ -1,5 +1,3 @@
-from typing import List, Tuple
-
 import cv2
 import numpy as np
 
@@ -30,7 +28,7 @@ class SceneGeometry:
         """Sign of the cross product => which side of line a->b point p is on."""
         return (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])
 
-    def crossed_line(self, prev_pt: Tuple[float, float], cur_pt: Tuple[float, float]) -> bool:
+    def crossed_line(self, prev_pt: tuple[float, float], cur_pt: tuple[float, float]) -> bool:
         """True if the segment prev_pt->cur_pt crosses the counting line
         in the configured 'forward' direction (belt travel direction)."""
         a, b = self.line

@@ -13,8 +13,8 @@ the scope of this task; swapping in a fine-tuned single-class "bag"
 checkpoint later is a one-line config change (BC_MMDET_CONFIG /
 BC_MMDET_CHECKPOINT) and nothing else in the pipeline has to change.
 """
+
 from dataclasses import dataclass
-from typing import List
 
 import numpy as np
 
@@ -60,7 +60,7 @@ class BagDetector:
         )
         self._class_names = self._model.dataset_meta["classes"]
 
-    def infer(self, frame_bgr: np.ndarray) -> List[Detection]:
+    def infer(self, frame_bgr: np.ndarray) -> list[Detection]:
         from mmdet.apis import inference_detector
 
         h, w = frame_bgr.shape[:2]
@@ -72,8 +72,8 @@ class BagDetector:
         scores = pred.scores.cpu().numpy()
         labels = pred.labels.cpu().numpy()
 
-        detections: List[Detection] = []
-        for box, score, label in zip(boxes, scores, labels):
+        detections: list[Detection] = []
+        for box, score, label in zip(boxes, scores, labels, strict=False):
             if score < settings.detection_score_thr:
                 continue
             x1, y1, x2, y2 = box.tolist()
@@ -82,10 +82,14 @@ class BagDetector:
                 continue
             detections.append(
                 Detection(
-                    x1=x1, y1=y1, x2=x2, y2=y2,
+                    x1=x1,
+                    y1=y1,
+                    x2=x2,
+                    y2=y2,
                     score=float(score),
                     label=self._class_names[int(label)]
-                    if int(label) < len(self._class_names) else str(label),
+                    if int(label) < len(self._class_names)
+                    else str(label),
                 )
             )
         return detections
@@ -101,11 +105,12 @@ class MockDetector:
 
     def __init__(self):
         import cv2
+
         self._bgsub = cv2.createBackgroundSubtractorMOG2(
             history=300, varThreshold=40, detectShadows=False
         )
 
-    def infer(self, frame_bgr: np.ndarray) -> List[Detection]:
+    def infer(self, frame_bgr: np.ndarray) -> list[Detection]:
         import cv2
 
         h, w = frame_bgr.shape[:2]
@@ -115,7 +120,7 @@ class MockDetector:
         mask = cv2.dilate(mask, np.ones((9, 9), np.uint8), iterations=2)
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        detections: List[Detection] = []
+        detections: list[Detection] = []
         for c in contours:
             x, y, bw, bh = cv2.boundingRect(c)
             area_ratio = (bw * bh) / frame_area
@@ -123,8 +128,12 @@ class MockDetector:
                 continue
             detections.append(
                 Detection(
-                    x1=x, y1=y, x2=x + bw, y2=y + bh,
-                    score=0.5, label="bag_candidate",
+                    x1=x,
+                    y1=y,
+                    x2=x + bw,
+                    y2=y + bh,
+                    score=0.5,
+                    label="bag_candidate",
                 )
             )
         return detections
@@ -135,6 +144,7 @@ def build_detector():
         return BagDetector()
     except Exception as exc:  # pragma: no cover - environment dependent
         import logging
+
         logging.getLogger(__name__).warning(
             "Falling back to MockDetector, MMDetection unavailable: %s", exc
         )
