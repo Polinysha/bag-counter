@@ -4,7 +4,7 @@
 # twice and guarantees the API and the worker always run the exact
 # same detector code/version.
 
-FROM python:3.10-slim
+FROM python:3.10-slim AS base
 
 # --- system deps -----------------------------------------------------
 # libgl1/libglib2.0-0: required by opencv for video decode/encode.
@@ -15,36 +15,51 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# --- python deps -------------------------------------------------------
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# --- core + CV python deps --------------------------------------------
+# Split so the lite image (SKIP_ML_STACK=true, see below) still gets a
+# fully working tracker/roi/counter/anomaly stack and MockDetector -
+# only the MMDetection/torch stack is conditional.
+COPY requirements/base.txt requirements/cv.txt ./requirements/
+RUN pip install --no-cache-dir \
+        -r requirements/base.txt \
+        -r requirements/cv.txt
+
+# --- heavy ML stack (BagDetector / MMDetection) -----------------------
+# ARG SKIP_ML_STACK=true builds a "lite" image: no torch/mmcv/mmdet, no
+# weight download. app/worker/pipeline/detector.py::build_detector()
+# already falls back to MockDetector automatically when MMDetection
+# can't be imported, so the rest of the pipeline (tracker/roi/counter/
+# anomaly/video_processor - everything unit-tested in backend/tests)
+# runs unchanged. Used for CI (lint/type-check/unit tests) and for
+# local dev on non-CV code, where the full ML stack is unnecessary
+# build weight. The production/demo image is always built with the
+# default (SKIP_ML_STACK=false) so BagDetector is available.
+# See requirements/ml.txt for the pinned version list this mirrors.
+ARG SKIP_ML_STACK=false
 
 # CPU-only torch by default (works everywhere, no GPU required to run
 # the demo). For GPU inference, replace this with the CUDA wheel that
 # matches your host driver and set BC_MMDET_DEVICE=cuda:0.
-RUN pip install --no-cache-dir torch==2.1.2 torchvision==0.16.2 \
-        --index-url https://download.pytorch.org/whl/cpu
-
-# mmcv ships prebuilt wheels per torch/cuda(or cpu) combination - mim
-# resolves the right one automatically for the torch version above.
-RUN pip install --no-cache-dir -U openmim \
-    && mim install mmengine==0.10.4 \
-    && mim install "mmcv==2.1.0" \
-    && pip install --no-cache-dir mmdet==3.3.0
-
-# Fetch the RTMDet-tiny COCO-pretrained config + checkpoint used as the
-# default detector (see app/config.py). `mim download` pulls both the
-# python config file and the .pth weights in one step, so no separate
-# mmdetection source checkout is needed just to get configs/.
-RUN mkdir -p /opt/mmdetection/configs/rtmdet && \
-    mim download mmdet \
-        --config rtmdet_tiny_8xb32-300e_coco \
-        --dest /opt/mmdetection/configs/rtmdet
+RUN if [ "$SKIP_ML_STACK" = "false" ]; then \
+        pip install --no-cache-dir torch==2.1.2 torchvision==0.16.2 \
+            --index-url https://download.pytorch.org/whl/cpu && \
+        pip install --no-cache-dir -U openmim==0.3.9 && \
+        mim install mmengine==0.10.4 && \
+        mim install "mmcv==2.1.0" && \
+        pip install --no-cache-dir mmdet==3.3.0 && \
+        mkdir -p /opt/mmdetection/configs/rtmdet && \
+        mim download mmdet \
+            --config rtmdet_tiny_8xb32-300e_coco \
+            --dest /opt/mmdetection/configs/rtmdet ; \
+    else \
+        echo "SKIP_ML_STACK=true: building a lite image, BagDetector unavailable, MockDetector will be used" ; \
+    fi
 
 COPY app ./app
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app
+    PYTHONPATH=/app \
+    BC_SKIP_ML_STACK=${SKIP_ML_STACK}
 
 # Overridden per-service by docker-compose.yml `command:`
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

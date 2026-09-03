@@ -1,0 +1,8 @@
+# --- Computer-vision runtime (no ML weights) --------------------------
+# Needed by tracker.py, roi.py, counter.py, anomaly.py, video_processor.py
+# and by MockDetector (background-subtraction fallback). Installed in
+# every image, including the lite/CI one, because these modules have
+# real unit-testable logic that does not require MMDetection at all.
+opencv-python-headless==4.10.0.84
+numpy==1.26.4
+scipy==1.13.1

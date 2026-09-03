@@ -1,0 +1,22 @@
+# --- Heavy ML detection stack (BagDetector / MMDetection) -------------
+# NOT installed via `pip install -r`: mmcv needs a prebuilt wheel matched
+# to the exact torch/CUDA-or-CPU build, so it is installed with `mim`
+# in backend/Dockerfile instead. This file exists purely as the pinned
+# version record for that stack, referenced from the Dockerfile so the
+# versions live in one place instead of being duplicated as magic
+# strings in RUN commands.
+#
+#   torch==2.1.2 / torchvision==0.16.2   (CPU wheel by default)
+#   openmim==0.3.9
+#   mmengine==0.10.4
+#   mmcv==2.1.0
+#   mmdet==3.3.0
+#
+# Skipped entirely when the image is built with `--build-arg
+# SKIP_ML_STACK=true` (see Dockerfile) -- in that mode BagDetector
+# can't be imported and the pipeline automatically falls back to
+# MockDetector (app/worker/pipeline/detector.py:build_detector). This
+# is what the "lite" image (used for lint/type-check/unit-test CI and
+# for local dev on the non-CV modules) is built with, since MMDetection
+# + torch account for the large majority of image size and build time
+# and are not required to exercise tracker/roi/counter/anomaly logic.
