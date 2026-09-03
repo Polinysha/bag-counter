@@ -10,21 +10,20 @@ minutes - observed on Docker Desktop for Windows - which RQ reports
 as "Redis connection timeout, quitting..." and restarts from. Running
 the Worker programmatically with our tuned connection avoids that.
 """
+
 import logging
 
 from rq import Worker
 
 from app.config import settings
-from app.worker.queue import redis_conn
+from app.worker.queue import TaskQueue
 
 logging.basicConfig(level=logging.INFO)
 
 
 def main() -> None:
-    worker = Worker(
-        [settings.queue_name],
-        connection=redis_conn,
-    )
+    task_queue = TaskQueue()
+    worker = Worker([settings.queue_name], connection=task_queue.redis_conn)
     worker.work(with_scheduler=False)
 
 
