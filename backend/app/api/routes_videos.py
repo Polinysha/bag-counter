@@ -7,6 +7,7 @@ from app.services.video_service import (
     InvalidUploadError,
     JobAlreadyProcessingError,
     ResultNotReadyError,
+    UploadTooLargeServiceError,
     VideoService,
     build_video_service,
 )
@@ -26,6 +27,9 @@ def upload_video(
     """
     try:
         job = service.upload(file)
+    except UploadTooLargeServiceError as exc:
+        # must be checked before InvalidUploadError - it's a subclass
+        raise HTTPException(413, str(exc)) from exc
     except InvalidUploadError as exc:
         raise HTTPException(400, str(exc)) from exc
     return JobCreatedResponse(id=job.id, status=job.status)

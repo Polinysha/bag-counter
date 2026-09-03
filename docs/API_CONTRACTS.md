@@ -34,12 +34,16 @@ JobStatus = "queued" | "processing" | "done" | "failed"
 Upload a video and create a `Job`. Does **not** start processing.
 
 * Request: `multipart/form-data`, field `file` (`.mp4`/`.avi`/`.mov`/`.mkv`;
-  unrecognized extensions are stored as `.mp4`).
+  unrecognized extensions are stored as `.mp4`). Capped at `BC_MAX_UPLOAD_MB`
+  (default 2048 MiB) - enforced while streaming, so an oversized upload is
+  rejected without being fully written to disk first.
 * Response `201`:
   ```json
   { "id": "string", "status": "queued" }
   ```
-* Errors: `400` if `file` has no filename.
+* Errors: `400` if `file` has no filename; `413` if the file exceeds
+  `BC_MAX_UPLOAD_MB` (the `Job` is still created and recorded as `failed`,
+  visible via `GET /api/v1/videos`, rather than silently dropped).
 
 ### `POST /api/v1/videos/{job_id}/process`
 
@@ -110,8 +114,17 @@ assume this stays unpaginated.
 
 ### `GET /api/health`
 
-* Response `200`: `{ "status": "ok" }`. No auth, no versioning - pure
-  liveness probe for orchestrators/load balancers.
+Actually checks its two hard dependencies (SQLite, Redis) rather than
+always returning "ok" - safe for an orchestrator to route traffic on.
+
+* Response `200` (healthy):
+  ```json
+  { "status": "ok", "checks": { "db": true, "redis": true } }
+  ```
+* Response `503` (degraded) - same shape, `status: "degraded"` and at
+  least one of `checks` is `false`. Still valid JSON, no auth, no
+  versioning - pure liveness/readiness probe for orchestrators/load
+  balancers.
 
 ## Error shape
 

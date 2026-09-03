@@ -72,6 +72,14 @@ class Settings(BaseSettings):
     draw_roi: bool = True
     draw_trails: bool = True
 
+    # --- upload limits -----------------------------------------------------
+    # Rejects the upload before it's fully written to disk (see
+    # StorageService.save_upload) - protects against someone filling the
+    # `data` volume with one huge/malicious upload. 2 GiB comfortably
+    # covers a multi-minute 1080p conveyor clip; raise via BC_MAX_UPLOAD_MB
+    # if your footage is longer/higher-res.
+    max_upload_mb: int = 2048
+
     class Config:
         env_prefix = "BC_"
 

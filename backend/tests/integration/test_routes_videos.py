@@ -103,7 +103,20 @@ def test_result_before_done_is_409(client):
     assert resp.status_code == 409
 
 
-def test_health_endpoint_is_ok(client):
+def test_health_endpoint_ok_when_dependencies_up(client, monkeypatch):
+    # app.main imports check_db/check_redis by name, so patch them there
+    # (patching app.health.check_db would not affect the already-bound
+    # reference main.py holds).
+    monkeypatch.setattr("app.main.check_db", lambda: True)
+    monkeypatch.setattr("app.main.check_redis", lambda: True)
     resp = client.get("/api/health")
     assert resp.status_code == 200
-    assert resp.json() == {"status": "ok"}
+    assert resp.json() == {"status": "ok", "checks": {"db": True, "redis": True}}
+
+
+def test_health_endpoint_503_when_redis_down(client, monkeypatch):
+    monkeypatch.setattr("app.main.check_db", lambda: True)
+    monkeypatch.setattr("app.main.check_redis", lambda: False)
+    resp = client.get("/api/health")
+    assert resp.status_code == 503
+    assert resp.json() == {"status": "degraded", "checks": {"db": True, "redis": False}}
