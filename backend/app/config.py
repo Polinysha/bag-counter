@@ -27,8 +27,7 @@ class Settings(BaseSettings):
     # (see backend/Dockerfile) - no network access needed at runtime.
     mmdet_config: str = "/opt/mmdetection/configs/rtmdet/rtmdet_tiny_8xb32-300e_coco.py"
     mmdet_checkpoint: str = (
-        "/opt/mmdetection/configs/rtmdet/"
-        "rtmdet_tiny_8xb32-300e_coco_20220902_112414-78e30dcc.pth"
+        "/opt/mmdetection/configs/rtmdet/rtmdet_tiny_8xb32-300e_coco_20220902_112414-78e30dcc.pth"
     )
     mmdet_device: str = "cpu"  # "cuda:0" if a GPU is available
     detection_score_thr: float = 0.35
