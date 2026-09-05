@@ -19,6 +19,21 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 ### Changed
 - `main.py` moved from `@app.on_event("startup")` to a `lifespan` context manager.
 
+## [Unreleased] - license & detector testability
+
+### Added
+- `LICENSE` (MIT) + README pointer - the repo was `Public` with no
+  license, meaning nobody had explicit permission to use/fork it.
+- `postprocess_detections()` extracted from `BagDetector.infer()`
+  (app/worker/pipeline/detector.py) - the confidence/box-size filtering
+  and label-index mapping is now a pure function, independent of the
+  MMDetection model call. `BagDetector.infer()` itself is unchanged in
+  behavior, just delegates to it.
+- `tests/unit/test_detector.py` - 10 tests covering
+  `postprocess_detections()` (score threshold, min/max area ratio,
+  label mapping, edge cases) without needing MMDetection/torch
+  installed. This was the one pipeline module with zero test coverage.
+
 ## [Unreleased] - production hardening
 
 ### Added
