@@ -47,6 +47,47 @@ class Detection:
         return (self.x1, self.y1, self.x2, self.y2)
 
 
+def postprocess_detections(
+    boxes: np.ndarray,
+    scores: np.ndarray,
+    labels: np.ndarray,
+    *,
+    class_names: list[str],
+    frame_area: float,
+) -> list[Detection]:
+    """
+    Pure post-processing shared by BagDetector.infer(): confidence
+    threshold, ROI-scene box-size filter (settings.min/max_box_area_ratio),
+    and label-index -> name mapping.
+
+    Pulled out of BagDetector.infer() specifically so it's unit-testable
+    (tests/unit/test_detector.py) without MMDetection installed - infer()
+    itself still needs a real model to produce boxes/scores/labels in the
+    first place, but everything after that is plain array/threshold logic
+    with no dependency on mmdet, torch, or a GPU.
+    """
+    detections: list[Detection] = []
+    for box, score, label in zip(boxes, scores, labels, strict=False):
+        if score < settings.detection_score_thr:
+            continue
+        x1, y1, x2, y2 = (float(v) for v in box)
+        area_ratio = ((x2 - x1) * (y2 - y1)) / frame_area if frame_area else 0.0
+        if not (settings.min_box_area_ratio <= area_ratio <= settings.max_box_area_ratio):
+            continue
+        label_idx = int(label)
+        detections.append(
+            Detection(
+                x1=x1,
+                y1=y1,
+                x2=x2,
+                y2=y2,
+                score=float(score),
+                label=class_names[label_idx] if label_idx < len(class_names) else str(label),
+            )
+        )
+    return detections
+
+
 class BagDetector:
     """Loads once per worker process, reused across all frames/videos."""
 
@@ -64,35 +105,16 @@ class BagDetector:
         from mmdet.apis import inference_detector
 
         h, w = frame_bgr.shape[:2]
-        frame_area = float(h * w)
         result = inference_detector(self._model, frame_bgr)
 
         pred = result.pred_instances
-        boxes = pred.bboxes.cpu().numpy()
-        scores = pred.scores.cpu().numpy()
-        labels = pred.labels.cpu().numpy()
-
-        detections: list[Detection] = []
-        for box, score, label in zip(boxes, scores, labels, strict=False):
-            if score < settings.detection_score_thr:
-                continue
-            x1, y1, x2, y2 = box.tolist()
-            area_ratio = ((x2 - x1) * (y2 - y1)) / frame_area
-            if not (settings.min_box_area_ratio <= area_ratio <= settings.max_box_area_ratio):
-                continue
-            detections.append(
-                Detection(
-                    x1=x1,
-                    y1=y1,
-                    x2=x2,
-                    y2=y2,
-                    score=float(score),
-                    label=self._class_names[int(label)]
-                    if int(label) < len(self._class_names)
-                    else str(label),
-                )
-            )
-        return detections
+        return postprocess_detections(
+            pred.bboxes.cpu().numpy(),
+            pred.scores.cpu().numpy(),
+            pred.labels.cpu().numpy(),
+            class_names=self._class_names,
+            frame_area=float(h * w),
+        )
 
 
 class MockDetector:

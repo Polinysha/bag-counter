@@ -5,6 +5,16 @@ Each item below is meant to become one GitHub Issue (see
 `feature/<name>` branch into `dev` (see `CONTRIBUTING.md`). Check items
 off here as their issue closes.
 
+## Testing
+- [ ] `BagDetector.infer()` itself (the MMDetection call, not just the
+      `postprocess_detections()` logic it wraps - see
+      `tests/unit/test_detector.py`) still has no automated test: doing
+      so needs either a tiny real checkpoint fixture or a mocked
+      `inference_detector` return shape, and isn't free to set up. Low
+      priority since `postprocess_detections` - the part actually at
+      risk of a silent regression (thresholds, label mapping) - is
+      covered.
+
 ## Detection & counting accuracy
 - [ ] Fine-tune an MMDetection checkpoint on labeled frames from this
       conveyor instead of the class-agnostic COCO-pretrained detector

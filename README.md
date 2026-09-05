@@ -270,3 +270,7 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the `main` / `dev` / `feature/*` br
   Server-Sent Events / WebSocket on top of the same `Job` table.
 * A single worker by default — to process multiple videos in parallel:
   `docker compose up --scale worker=N`.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
