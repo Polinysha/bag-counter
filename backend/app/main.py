@@ -7,10 +7,12 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes_videos import router as videos_router
+from app.config import settings
 from app.db import init_db
 from app.health import check_db, check_redis
 
 logging.basicConfig(level=logging.INFO)
+log = logging.getLogger(__name__)
 
 API_V1_PREFIX = "/api/v1"
 
@@ -18,6 +20,11 @@ API_V1_PREFIX = "/api/v1"
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
+    if not settings.api_key:
+        log.warning(
+            "BC_API_KEY is not set - /api/v1/* is running WITHOUT authentication. "
+            "Set BC_API_KEY (see .env.example) before exposing this beyond a trusted network."
+        )
     yield
 
 

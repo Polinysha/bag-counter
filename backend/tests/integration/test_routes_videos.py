@@ -120,3 +120,37 @@ def test_health_endpoint_503_when_redis_down(client, monkeypatch):
     resp = client.get("/api/health")
     assert resp.status_code == 503
     assert resp.json() == {"status": "degraded", "checks": {"db": True, "redis": False}}
+
+
+def test_videos_route_open_when_no_api_key_configured(client, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "api_key", None)
+    resp = client.get("/api/v1/videos")
+    assert resp.status_code == 200
+
+
+def test_videos_route_401_without_key_when_configured(client, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "api_key", "expected-secret")
+    resp = client.get("/api/v1/videos")
+    assert resp.status_code == 401
+
+
+def test_videos_route_200_with_correct_key(client, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "api_key", "expected-secret")
+    resp = client.get("/api/v1/videos", headers={"X-API-Key": "expected-secret"})
+    assert resp.status_code == 200
+
+
+def test_health_endpoint_unauthenticated_even_when_api_key_configured(client, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "api_key", "expected-secret")
+    monkeypatch.setattr("app.main.check_db", lambda: True)
+    monkeypatch.setattr("app.main.check_redis", lambda: True)
+    resp = client.get("/api/health")  # no X-API-Key header
+    assert resp.status_code == 200

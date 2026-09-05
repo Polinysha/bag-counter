@@ -19,6 +19,23 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 ### Changed
 - `main.py` moved from `@app.on_event("startup")` to a `lifespan` context manager.
 
+## [Unreleased] - API-key authentication
+
+### Added
+- `app/auth.py`: shared-secret `X-API-Key` auth for every `/api/v1/*`
+  route, gated by `BC_API_KEY` (open/unauthenticated mode when unset,
+  which is the default and logs a startup warning). Constant-time
+  comparison via `hmac.compare_digest`.
+- Frontend: API-key input field (session-only storage), sent as
+  `X-API-Key` on every request; downloading the processed video now
+  goes through `fetch()` + a Blob URL when a key is set, since a plain
+  `<a href>` can't attach a custom header.
+- `docs/API_CONTRACTS.md`, README "Security" section, `.env.example`,
+  `docker-compose.yml` updated to document/wire `BC_API_KEY`.
+- Tests: `tests/unit/test_auth.py` (dependency logic), 4 new
+  integration tests (open mode, missing/wrong/correct key, health
+  endpoint staying unauthenticated).
+
 ## [Unreleased] - license & detector testability
 
 ### Added
