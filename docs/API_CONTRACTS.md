@@ -18,6 +18,20 @@ Any breaking change (removing/renaming a field, changing a status code's
 meaning, changing required-ness) ships as `/api/v2` with `v1` kept
 running until clients migrate - never a silent breaking change to `v1`.
 
+## Authentication
+
+Every endpoint under `/api/v1` requires an `X-API-Key` header matching
+`BC_API_KEY`, **if and only if** `BC_API_KEY` is set on the server (see
+`.env.example` / README "Security"). If it's unset, the API runs in
+open mode - no header needed - which is the default for local/demo use.
+
+* Missing or wrong key (when `BC_API_KEY` is configured): `401`
+  ```json
+  { "detail": "Missing or invalid API key" }
+  ```
+* `GET /api/health` is never behind this, regardless of `BC_API_KEY` -
+  it's a liveness probe, not a business endpoint.
+
 ## Resources
 
 ### `Job`

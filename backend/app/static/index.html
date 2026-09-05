@@ -20,12 +20,20 @@
     padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem;
   }
   .error-banner.visible { display: block; }
+  .key-row { display: flex; gap: 8px; align-items: center; }
+  .key-row input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
 </style>
 </head>
 <body>
   <h1>Подсчёт мешков на конвейере</h1>
 
   <div class="error-banner" id="errorBanner"></div>
+
+  <div class="card">
+    <div class="key-row">
+      <input type="password" id="apiKey" placeholder="API-ключ (если сервер требует)"/>
+    </div>
+  </div>
 
   <div class="card">
     <input type="file" id="file" accept="video/*"/>
@@ -53,6 +61,14 @@ let pollTimer = null;
 const MAX_CONSECUTIVE_POLL_FAILURES = 4;
 let consecutivePollFailures = 0;
 
+// Persisted per-tab (not permanently) so a reload doesn't force
+// re-entering the key, but it's never written to localStorage/disk.
+const apiKeyInput = document.getElementById("apiKey");
+apiKeyInput.value = sessionStorage.getItem("bagCounterApiKey") || "";
+apiKeyInput.addEventListener("input", () => {
+  sessionStorage.setItem("bagCounterApiKey", apiKeyInput.value);
+});
+
 function showError(message) {
   const banner = document.getElementById("errorBanner");
   banner.textContent = message;
@@ -65,16 +81,24 @@ function clearError() {
   banner.textContent = "";
 }
 
-// Wraps fetch with: network-error handling (fetch() itself only rejects
-// on network failure, not on 4xx/5xx) and non-OK-status handling, so
-// every call site below gets a real Error instead of silently getting
-// back an error-shaped JSON body or an uncaught rejection.
-async function apiFetch(url, options) {
+// Wraps fetch with: the API-key header (only needed if the server was
+// started with BC_API_KEY set - see .env.example; harmless/no-op
+// otherwise), network-error handling (fetch() itself only rejects on
+// network failure, not on 4xx/5xx), and non-OK-status handling with a
+// specific message for 401 so a wrong/missing key is obvious rather
+// than looking like a generic server error.
+async function apiFetch(url, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  if (apiKeyInput.value) headers["X-API-Key"] = apiKeyInput.value;
+
   let response;
   try {
-    response = await fetch(url, options);
+    response = await fetch(url, { ...options, headers });
   } catch (networkErr) {
     throw new Error("Не удалось связаться с сервером. Проверьте соединение и повторите попытку.");
+  }
+  if (response.status === 401) {
+    throw new Error("Неверный или отсутствующий API-ключ. Введите его в поле выше.");
   }
   if (!response.ok) {
     let detail = `Ошибка сервера (HTTP ${response.status})`;
@@ -140,8 +164,7 @@ async function poll(id) {
 
     if (s.status === "done") {
       clearInterval(pollTimer);
-      document.getElementById("resultArea").innerHTML =
-        `<a class="download" href="${API}/${id}/result">Скачать обработанное видео</a>`;
+      renderDownloadLink(id);
       loadAnomalies(id);
     }
     if (s.status === "failed") {
@@ -149,6 +172,33 @@ async function poll(id) {
       document.getElementById("resultArea").textContent = "Ошибка обработки: " + (s.error ?? "неизвестная ошибка");
     }
   }, 1500);
+}
+
+// A plain <a href> can't attach the X-API-Key header, so when a key is
+// set the download has to go through fetch() (like every other call)
+// and be turned into a Blob URL instead of a direct link.
+async function renderDownloadLink(id) {
+  const area = document.getElementById("resultArea");
+  if (!apiKeyInput.value) {
+    area.innerHTML = `<a class="download" href="${API}/${id}/result">Скачать обработанное видео</a>`;
+    return;
+  }
+  area.innerHTML = `<button id="downloadBtn">Скачать обработанное видео</button>`;
+  document.getElementById("downloadBtn").onclick = async () => {
+    try {
+      const response = await fetch(`${API}/${id}/result`, { headers: { "X-API-Key": apiKeyInput.value } });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${id}_processed.mp4`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      showError("Не удалось скачать результат: " + err.message);
+    }
+  };
 }
 
 async function loadAnomalies(id) {

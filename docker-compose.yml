@@ -18,6 +18,7 @@ services:
       - BC_DATA_DIR=/data
       - BC_MMDET_DEVICE=${MMDET_DEVICE:-cpu}
       - BC_MAX_UPLOAD_MB=${MAX_UPLOAD_MB:-2048}
+      - BC_API_KEY=${API_KEY:-}
     volumes:
       - ./data:/data
     depends_on:

@@ -37,9 +37,10 @@ off here as their issue closes.
       not just the lite sanity build used on every PR.
 
 ## API / product
-- [ ] AuthN/authZ - currently anyone who can reach the API can upload
-      and list all jobs; needed before this is exposed beyond a trusted
-      network.
+- [x] AuthN/authZ - shared-secret `X-API-Key` auth (`app/auth.py`,
+      `BC_API_KEY`), see README "Security". Deliberately not per-user
+      accounts/RBAC - single-tenant tool, see the module's docstring
+      for the reasoning; revisit only if that assumption changes.
 - [ ] Job retention / cleanup policy for `./data` (uploads + processed
       videos currently accumulate forever).
 - [ ] Pagination for `GET /api/v1/videos` (currently returns every job).

@@ -255,6 +255,12 @@ data/                            # bind-mount volume (empty in the repository)
 
 The full REST contract (resources, request/response schemas, status codes, the versioning and backward-compatibility policy) is specified in [`docs/API_CONTRACTS.md`](docs/API_CONTRACTS.md) and enforced at runtime by the Pydantic models in `app/schemas.py`. The live interactive contract is always at `/docs` (Swagger) / `/openapi.json`. All endpoints are versioned under `/api/v1`.
 
+## Security
+
+`/api/v1/*` is unauthenticated by default (open mode) so a fresh `docker compose up` works out of the box for local/demo use - a warning is logged at startup when running this way. Set `BC_API_KEY` (see `.env.example`) to require a matching `X-API-Key` header on every request; `app/auth.py` checks it with a constant-time comparison. `GET /api/health` is intentionally never behind this - it's a liveness probe, not a business endpoint.
+
+This is a shared-secret, single-tenant scheme on purpose - see `app/auth.py`'s docstring for why a full user/login system would be over-engineering for what this project actually is. If you need per-user accounts or audit trails, that's a real redesign, not an extension of this module.
+
 ## Contributing / Branching Model
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the `main` / `dev` / `feature/*` branching model, commit conventions, and how PRs are expected to flow. Planned follow-up work is tracked in [`ROADMAP.md`](ROADMAP.md), mirrored into GitHub Issues.
