@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
+from app.auth import require_api_key
 from app.repositories.job_repository import JobNotFoundError
 from app.schemas import JobAnomaliesResponse, JobCreatedResponse, JobStatusResponse
 from app.services.video_service import (
@@ -12,7 +13,11 @@ from app.services.video_service import (
     build_video_service,
 )
 
-router = APIRouter(prefix="/videos", tags=["videos"])
+# dependencies=[...] applies require_api_key to every route on this
+# router - see app/auth.py for what it checks and app/main.py for why
+# GET /api/health is intentionally NOT behind this (it's outside this
+# router, mounted separately, unauthenticated on purpose).
+router = APIRouter(prefix="/videos", tags=["videos"], dependencies=[Depends(require_api_key)])
 
 
 @router.post("", response_model=JobCreatedResponse, status_code=201)

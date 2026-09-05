@@ -80,6 +80,12 @@ class Settings(BaseSettings):
     # if your footage is longer/higher-res.
     max_upload_mb: int = 2048
 
+    # --- auth ----------------------------------------------------------
+    # Unset by default (open mode - see app/auth.py). Set BC_API_KEY to
+    # require an `X-API-Key` header on every /api/v1/* request. Generate
+    # one with: python -c "import secrets; print(secrets.token_urlsafe(32))"
+    api_key: str | None = None
+
     class Config:
         env_prefix = "BC_"
 
