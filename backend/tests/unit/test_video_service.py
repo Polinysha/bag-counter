@@ -11,7 +11,7 @@ import pytest
 from fastapi import UploadFile
 
 from app.models import Job, JobStatus
-from app.repositories.job_repository import JobNotFoundError
+from app.repositories.job_repository import JobNotFoundError, JobPage
 from app.services.storage import UploadTooLargeError
 from app.services.video_service import (
     JobAlreadyProcessingError,
@@ -52,8 +52,10 @@ class FakeRepository:
         self.jobs[job_id].status = JobStatus.failed
         self.jobs[job_id].error = error
 
-    def list_all(self) -> list[Job]:
-        return list(self.jobs.values())
+    def list_page(self, *, limit: int, offset: int) -> JobPage:
+        # newest-first, matching JobRepository.list_page's ordering
+        all_jobs = sorted(self.jobs.values(), key=lambda j: j.id, reverse=True)
+        return JobPage(items=all_jobs[offset : offset + limit], total=len(all_jobs))
 
 
 class FakeStorage:
@@ -112,3 +114,45 @@ def test_start_processing_enqueues_exactly_once():
     service.start_processing(job.id)
 
     assert queue.enqueued == [job.id]
+
+
+def test_list_jobs_returns_page_and_total():
+    repo = FakeRepository()
+    service = VideoService(repo, FakeStorage(), FakeTaskQueue())
+    for _ in range(5):
+        service.upload(_upload_file())
+
+    page = service.list_jobs(limit=2, offset=0)
+    assert len(page.items) == 2
+    assert page.total == 5
+
+
+def test_list_jobs_offset_beyond_total_returns_empty_page():
+    repo = FakeRepository()
+    service = VideoService(repo, FakeStorage(), FakeTaskQueue())
+    service.upload(_upload_file())
+
+    page = service.list_jobs(limit=10, offset=100)
+    assert page.items == []
+    assert page.total == 1
+
+
+def test_list_jobs_rejects_limit_below_one():
+    repo = FakeRepository()
+    service = VideoService(repo, FakeStorage(), FakeTaskQueue())
+    with pytest.raises(ValueError, match="limit"):
+        service.list_jobs(limit=0, offset=0)
+
+
+def test_list_jobs_rejects_limit_above_max():
+    repo = FakeRepository()
+    service = VideoService(repo, FakeStorage(), FakeTaskQueue())
+    with pytest.raises(ValueError, match="limit"):
+        service.list_jobs(limit=VideoService.MAX_PAGE_SIZE + 1, offset=0)
+
+
+def test_list_jobs_rejects_negative_offset():
+    repo = FakeRepository()
+    service = VideoService(repo, FakeStorage(), FakeTaskQueue())
+    with pytest.raises(ValueError, match="offset"):
+        service.list_jobs(limit=10, offset=-1)

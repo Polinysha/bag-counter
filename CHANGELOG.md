@@ -19,6 +19,26 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 ### Changed
 - `main.py` moved from `@app.on_event("startup")` to a `lifespan` context manager.
 
+## [Unreleased] - pagination for GET /videos
+
+### Changed
+- `GET /api/v1/videos` now takes `?limit=<1-200, default 50>&offset=`
+  and returns `{items, total, limit, offset}` instead of a bare
+  `JobStatusResponse[]` array. See docs/API_CONTRACTS.md for why this
+  is not treated as a `v1` compatibility break (the endpoint was
+  always documented as "unpaginated today ... do not build clients
+  that assume this stays unpaginated").
+- `JobRepository.list_all()` replaced by `list_page(limit, offset)`,
+  returning a `JobPage(items, total)`. `VideoService.list_jobs()` now
+  validates `limit`/`offset` itself (not just at the FastAPI `Query()`
+  layer), since it's meant to be callable from non-HTTP contexts too.
+
+### Added
+- 9 new tests: `tests/unit/test_video_service.py` (page slicing, total
+  count, offset-beyond-total, limit/offset validation), 4 new
+  integration tests on the real route (envelope shape, defaults, 422
+  on out-of-range params).
+
 ## [Unreleased] - API-key authentication
 
 ### Added
