@@ -1,9 +1,14 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 
 from app.auth import require_api_key
 from app.repositories.job_repository import JobNotFoundError
-from app.schemas import JobAnomaliesResponse, JobCreatedResponse, JobStatusResponse
+from app.schemas import (
+    JobAnomaliesResponse,
+    JobCreatedResponse,
+    JobStatusResponse,
+    PaginatedJobsResponse,
+)
 from app.services.video_service import (
     InvalidUploadError,
     JobAlreadyProcessingError,
@@ -97,7 +102,26 @@ def download_result(job_id: str, service: VideoService = Depends(build_video_ser
     )
 
 
-@router.get("", response_model=list[JobStatusResponse])
-def list_jobs(service: VideoService = Depends(build_video_service)):
-    jobs = service.list_jobs()
-    return [JobStatusResponse.from_job(j) for j in jobs]
+@router.get("", response_model=PaginatedJobsResponse)
+def list_jobs(
+    limit: int = Query(
+        default=VideoService.DEFAULT_PAGE_SIZE,
+        ge=1,
+        le=VideoService.MAX_PAGE_SIZE,
+        description="Max jobs to return.",
+    ),
+    offset: int = Query(default=0, ge=0, description="Jobs to skip, newest first."),
+    service: VideoService = Depends(build_video_service),
+):
+    """
+    Newest jobs first. See docs/API_CONTRACTS.md "GET /videos" - this
+    endpoint's response was always documented as subject to change from
+    a bare array to a paginated envelope, which is what this is.
+    """
+    page = service.list_jobs(limit=limit, offset=offset)
+    return PaginatedJobsResponse(
+        items=[JobStatusResponse.from_job(j) for j in page.items],
+        total=page.total,
+        limit=limit,
+        offset=offset,
+    )

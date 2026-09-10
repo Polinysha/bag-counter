@@ -43,7 +43,10 @@ off here as their issue closes.
       for the reasoning; revisit only if that assumption changes.
 - [ ] Job retention / cleanup policy for `./data` (uploads + processed
       videos currently accumulate forever).
-- [ ] Pagination for `GET /api/v1/videos` (currently returns every job).
+- [x] Pagination for `GET /api/v1/videos` - `?limit=&offset=` query
+      params, response wrapped in `{items, total, limit, offset}`. See
+      docs/API_CONTRACTS.md for why this shape change doesn't count as
+      a `v1` break (the endpoint was always documented as subject to it).
 
 ## Tooling hardening
 - [ ] Tighten `mypy` incrementally: `disallow_untyped_defs = true`

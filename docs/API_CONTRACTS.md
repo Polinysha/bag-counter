@@ -120,11 +120,26 @@ Downloads the processed video (`video/mp4`).
 
 ### `GET /api/v1/videos`
 
-Lists all jobs, newest first. **Unpaginated today** - see
-`ROADMAP.md` "Paginate GET /api/v1/videos"; do not build clients that
-assume this stays unpaginated.
+Paginated, newest first. `?limit=<1-200, default 50>&offset=<default 0>`.
 
-* Response `200`: `JobStatusResponse[]` (same shape as the single-job GET).
+* Response `200`:
+  ```json
+  {
+    "items": ["JobStatusResponse", "..."],
+    "total": "int - total jobs across all pages",
+    "limit": "int - echoes the request's limit",
+    "offset": "int - echoes the request's offset"
+  }
+  ```
+* Errors: `422` if `limit`/`offset` are out of range (FastAPI's standard
+  query-validation error shape, not the `{"detail": "..."}` string form
+  used elsewhere in this doc).
+
+Note: this endpoint used to return a bare `JobStatusResponse[]` array.
+This document always flagged it as "unpaginated today ... do not build
+clients that assume this stays unpaginated" specifically so this shape
+change wouldn't count as a `v1` compatibility break - see the
+checklist below.
 
 ### `GET /api/health`
 

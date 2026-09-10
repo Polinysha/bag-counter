@@ -10,13 +10,12 @@ a gRPC endpoint, a batch script) can reuse the exact same logic.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from typing import Protocol
 
 from fastapi import UploadFile
 
 from app.models import Job, JobStatus
-from app.repositories.job_repository import JobNotFoundError, JobRepository
+from app.repositories.job_repository import JobNotFoundError, JobPage, JobRepository
 from app.services.storage import StorageService, UploadTooLargeError
 from app.worker.queue import TaskQueue
 
@@ -36,7 +35,7 @@ class JobRepositoryProtocol(Protocol):
     def set_input_path(self, job_id: str, input_path: str) -> Job: ...
     def mark_queued(self, job_id: str) -> Job: ...
     def mark_failed(self, job_id: str, *, error: str) -> None: ...
-    def list_all(self) -> Sequence[Job]: ...
+    def list_page(self, *, limit: int, offset: int) -> JobPage: ...
 
 
 class StorageServiceProtocol(Protocol):
@@ -105,8 +104,20 @@ class VideoService:
     def get_anomalies(self, job_id: str) -> Job:
         return self._repository.get_or_raise(job_id)
 
-    def list_jobs(self) -> list[Job]:
-        return list(self._repository.list_all())
+    #: Bounds shared with the route's `Query(...)` constraints
+    #: (app/api/routes_videos.py) so both layers agree on what's valid -
+    #: defined here rather than only at the HTTP layer since VideoService
+    #: is meant to be reusable from a non-HTTP caller too (see module
+    #: docstring).
+    DEFAULT_PAGE_SIZE = 50
+    MAX_PAGE_SIZE = 200
+
+    def list_jobs(self, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0) -> JobPage:
+        if not (1 <= limit <= self.MAX_PAGE_SIZE):
+            raise ValueError(f"limit must be between 1 and {self.MAX_PAGE_SIZE}")
+        if offset < 0:
+            raise ValueError("offset must be >= 0")
+        return self._repository.list_page(limit=limit, offset=offset)
 
     def get_result_path(self, job_id: str) -> tuple[Job, str]:
         job = self._repository.get_or_raise(job_id)
