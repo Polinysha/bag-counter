@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.models import Job, JobStatus
-from app.repositories.job_repository import JobNotFoundError
+from app.repositories.job_repository import JobNotFoundError, JobPage
 from app.services.video_service import (
     JobAlreadyProcessingError,
     ResultNotReadyError,
@@ -57,8 +57,9 @@ class FakeVideoService:
     def get_anomalies(self, job_id: str) -> Job:
         return self.get_status(job_id)
 
-    def list_jobs(self):
-        return list(self._jobs.values())
+    def list_jobs(self, *, limit: int, offset: int):
+        all_jobs = list(self._jobs.values())
+        return JobPage(items=all_jobs[offset : offset + limit], total=len(all_jobs))
 
     def get_result_path(self, job_id: str):
         job = self.get_status(job_id)
@@ -154,3 +155,34 @@ def test_health_endpoint_unauthenticated_even_when_api_key_configured(client, mo
     monkeypatch.setattr("app.main.check_redis", lambda: True)
     resp = client.get("/api/health")  # no X-API-Key header
     assert resp.status_code == 200
+
+
+def test_list_videos_returns_paginated_envelope(client):
+    for _ in range(3):
+        client.post("/api/v1/videos", files={"file": ("clip.mp4", BytesIO(b"x"), "video/mp4")})
+
+    resp = client.get("/api/v1/videos?limit=2&offset=0")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 3
+    assert body["limit"] == 2
+    assert body["offset"] == 0
+    assert len(body["items"]) == 2
+
+
+def test_list_videos_default_pagination_params(client):
+    resp = client.get("/api/v1/videos")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["limit"] == 50
+    assert body["offset"] == 0
+
+
+def test_list_videos_rejects_limit_above_max(client):
+    resp = client.get("/api/v1/videos?limit=99999")
+    assert resp.status_code == 422
+
+
+def test_list_videos_rejects_negative_offset(client):
+    resp = client.get("/api/v1/videos?offset=-1")
+    assert resp.status_code == 422

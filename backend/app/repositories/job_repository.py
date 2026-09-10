@@ -16,12 +16,24 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime
 
-from sqlmodel import Session, select
+from sqlmodel import Session, func, select
 
 from app.db import engine
 from app.models import Job, JobStatus
+
+
+@dataclass
+class JobPage:
+    """One page of jobs plus the total count across all pages - the
+    count is needed by the API response (see schemas.PaginatedJobsResponse)
+    so a client can compute how many pages exist without a second request.
+    """
+
+    items: Sequence[Job]
+    total: int
 
 
 class JobRepository:
@@ -51,11 +63,16 @@ class JobRepository:
             raise JobNotFoundError(job_id)
         return job
 
-    def list_all(self) -> Sequence[Job]:
+    def list_page(self, *, limit: int, offset: int) -> JobPage:
         with self._session_scope() as session:
-            return session.exec(
-                select(Job).order_by(Job.created_at.desc())  # type: ignore[attr-defined]
+            total = session.exec(select(func.count()).select_from(Job)).one()
+            items = session.exec(
+                select(Job)
+                .order_by(Job.created_at.desc())  # type: ignore[attr-defined]
+                .limit(limit)
+                .offset(offset)
             ).all()
+            return JobPage(items=items, total=total)
 
     # --- writes ------------------------------------------------------------
 

@@ -58,3 +58,20 @@ class JobAnomaliesResponse(BaseModel):
     id: str
     bag_count: int
     anomalies: list[AnomalyOut]
+
+
+class PaginatedJobsResponse(BaseModel):
+    """Response for GET /videos. Wraps a page of jobs with the total
+    count so a client can compute page count without a second request.
+
+    Note for API_CONTRACTS.md readers: GET /videos previously returned
+    a bare JSON array. docs/API_CONTRACTS.md always documented that
+    endpoint as "unpaginated today ... do not build clients that
+    assume this stays unpaginated" specifically to allow this shape
+    change without it counting as a v1 compatibility break.
+    """
+
+    items: list[JobStatusResponse]
+    total: int
+    limit: int
+    offset: int
