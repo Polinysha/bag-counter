@@ -33,8 +33,11 @@ off here as their issue closes.
       fallback).
 - [ ] GPU image variant: CUDA torch wheel + `BC_MMDET_DEVICE=cuda:0`,
       published as a separate tag alongside the CPU image.
-- [ ] CI: build & publish the full (non-lite) image on release tags,
-      not just the lite sanity build used on every PR.
+- [x] CI: build & publish the full (non-lite) image on release tags,
+      not just the lite sanity build used on every PR -
+      `.github/workflows/release.yml`, triggered on `v*.*.*` tags,
+      pushes to `ghcr.io/polinysha/bag-counter`. See README "Published
+      image" and CONTRIBUTING.md step 6.
 
 ## API / product
 - [x] AuthN/authZ - shared-secret `X-API-Key` auth (`app/auth.py`,

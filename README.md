@@ -55,6 +55,31 @@ By default inference runs on CPU (`MMDET_DEVICE=cpu` in `.env` /
 set `MMDET_DEVICE=cuda:0` — details are in the comments in
 `backend/Dockerfile` and `docker-compose.yml`.
 
+### Published image
+
+Every version tag (`vX.Y.Z`) is built (full image, not the lite/CI one — see
+`.github/workflows/release.yml`) and pushed to GitHub Container Registry, so
+you don't have to build it yourself:
+
+```bash
+docker pull ghcr.io/polinysha/bag-counter:v1.5.0
+# or the floating tag for whatever the latest release is:
+docker pull ghcr.io/polinysha/bag-counter:latest
+```
+
+This is the same image `docker compose up --build` produces locally — pulling
+it just skips the multi-GB PyTorch/MMDetection download-and-build step. It
+still needs the `redis` service and a `./data` mount to actually run; see
+`docker-compose.yml` for the full setup, or swap `build:` for
+`image: ghcr.io/polinysha/bag-counter:latest` there if you'd rather always
+pull than build.
+
+**First release only:** GitHub Container Registry packages default to
+*private* even in a public repo. After the first `v*.*.*` tag publishes one,
+go to the package's page (linked from the repo sidebar under "Packages") →
+Package settings → change visibility to Public, or `docker pull` will fail
+with a permission error for anyone not logged into `ghcr.io` on this repo.
+
 ## Architecture
 
 ```

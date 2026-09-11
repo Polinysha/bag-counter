@@ -31,6 +31,16 @@
 5. Once merged into `dev` and the batch has been exercised there, open a
    `dev -> main` PR to release it. `main` should only ever move forward
    through that PR.
+6. After the `dev -> main` PR merges, tag the merge commit (`vX.Y.Z`,
+   semver) and push the tag. This is what triggers
+   `.github/workflows/release.yml`, which builds the **full** image
+   (with the MMDetection/torch stack) and publishes it to
+   `ghcr.io/polinysha/bag-counter` - the every-PR `lite-docker-build`
+   CI job only sanity-checks that the lite image still builds, it
+   never publishes anything. **Only tag after confirming the merge
+   commit is actually on `main`** (`git pull` should show a real
+   fast-forward, not "Already up to date") - tagging the wrong commit
+   publishes a release image that doesn't match the tag.
 
 ## Issues
 
