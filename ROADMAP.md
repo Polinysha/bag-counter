@@ -52,9 +52,14 @@ off here as their issue closes.
       a `v1` break (the endpoint was always documented as subject to it).
 
 ## Tooling hardening
-- [ ] Tighten `mypy` incrementally: `disallow_untyped_defs = true`
-      module-by-module (see `[tool.mypy]` in `backend/pyproject.toml`),
-      starting with `app/services` and `app/repositories`.
+- [x] Tighten `mypy` incrementally: `disallow_untyped_defs = true`
+      module-by-module (see `[tool.mypy]` in `backend/pyproject.toml`).
+      Done for `app/services` and `app/repositories` - both were
+      already fully annotated except one Protocol method, so this
+      mostly just locks in what was already true and prevents drift.
+      Next candidates: `app/api`, `app/worker` (excluding `pipeline/`,
+      which touches untyped cv2/mmdet APIs at the boundary and isn't
+      worth fighting).
 - [ ] Enforce Conventional Commits via a commit-msg hook (referenced as
       "preferred but not enforced" in `CONTRIBUTING.md`).
 - [ ] Dependabot/renovate config for `requirements/*.txt` version bumps.

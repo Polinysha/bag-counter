@@ -19,6 +19,20 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 ### Changed
 - `main.py` moved from `@app.on_event("startup")` to a `lifespan` context manager.
 
+## [Unreleased] - mypy: disallow_untyped_defs for services/repositories
+
+### Changed
+- `backend/pyproject.toml`: added a `[[tool.mypy.overrides]]` block
+  enabling `disallow_untyped_defs = true` for `app.services.*` and
+  `app.repositories.*` - every function in these packages now needs a
+  full signature (return type included), not just some parameters
+  annotated. The rest of the codebase keeps the looser global default
+  for now; see ROADMAP.md "Tooling hardening" for the next candidates.
+- `app/services/video_service.py`: `StorageServiceProtocol.save_upload`
+  was missing a return type annotation (`-> Path`) - the one thing
+  this override actually caught, since both packages were already
+  otherwise fully typed.
+
 ## [Unreleased] - publish full image on release tags
 
 ### Added
