@@ -19,6 +19,22 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 ### Changed
 - `main.py` moved from `@app.on_event("startup")` to a `lifespan` context manager.
 
+## [Unreleased] - publish full image on release tags
+
+### Added
+- `.github/workflows/release.yml`: on every `v*.*.*` tag push, builds
+  the FULL image (`SKIP_ML_STACK=false` - the actual MMDetection/torch
+  stack, not the lite/CI sanity-build image) and pushes it to GitHub
+  Container Registry as `ghcr.io/polinysha/bag-counter:<version>`,
+  `:<major>.<minor>`, and `:latest`. Uses the built-in `GITHUB_TOKEN`
+  (no extra secrets to configure) and the GitHub Actions build cache.
+- README "Published image" section (how to `docker pull` it, and the
+  one-time step to make the GHCR package public after the first
+  release).
+- CONTRIBUTING.md step 6: tag only after confirming the `dev -> main`
+  merge commit is actually on `main`, since tagging the wrong commit
+  publishes a release image that doesn't match the tag.
+
 ## [Unreleased] - pagination for GET /videos
 
 ### Changed
