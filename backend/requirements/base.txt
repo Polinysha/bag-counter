@@ -1,6 +1,6 @@
 # --- Core runtime: API + queue + persistence -------------------------
 # Installed in every image (full and lite/CI). No CV or ML deps here.
-fastapi==0.111.0
+fastapi==0.141.1
 uvicorn[standard]==0.30.1
 python-multipart==0.0.9   # required by FastAPI/Starlette for multipart file uploads (not imported directly)
 sqlmodel==0.0.19
