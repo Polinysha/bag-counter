@@ -6,4 +6,4 @@ python-multipart==0.0.9   # required by FastAPI/Starlette for multipart file upl
 sqlmodel==0.0.19
 pydantic-settings==2.3.4
 redis==5.0.7
-rq==1.16.2
+rq==2.12.0
