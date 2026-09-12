@@ -60,8 +60,13 @@ off here as their issue closes.
       Next candidates: `app/api`, `app/worker` (excluding `pipeline/`,
       which touches untyped cv2/mmdet APIs at the boundary and isn't
       worth fighting).
-- [ ] Enforce Conventional Commits via a commit-msg hook (referenced as
-      "preferred but not enforced" in `CONTRIBUTING.md`).
+- [x] Enforce Conventional Commits via a commit-msg hook - local
+      enforcement via `.pre-commit-config.yaml`'s
+      `conventional-pre-commit` hook (needs `pre-commit install`, now
+      installed for both `pre-commit` and `commit-msg` stages by
+      default - see `default_install_hook_types`), backstopped by
+      `.github/workflows/ci.yml`'s `commit-messages` job for any
+      commit made with `--no-verify`. Merge commits are exempt.
 - [x] Dependabot config - `.github/dependabot.yml` covers
       `requirements/*.txt` (pip), `backend/Dockerfile`'s base image
       (docker), and `.github/workflows/*.yml` action versions

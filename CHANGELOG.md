@@ -19,6 +19,24 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 ### Changed
 - `main.py` moved from `@app.on_event("startup")` to a `lifespan` context manager.
 
+## [Unreleased] - enforce Conventional Commits
+
+### Added
+- `.pre-commit-config.yaml`: `conventional-pre-commit` hook on the
+  `commit-msg` stage, rejecting commit messages that don't start with
+  a Conventional Commits type (`feat:`, `fix:`, `refactor:`, etc.,
+  optionally scoped/breaking). `default_install_hook_types` added so
+  a plain `pre-commit install` sets up both stages, not just
+  `pre-commit`.
+- `.github/workflows/ci.yml`: new `commit-messages` job (PRs only),
+  re-checking every non-merge commit in the PR's range against the
+  same pattern - catches a commit made with `git commit --no-verify`
+  that skipped the local hook. Merge commits (`Merge pull request
+  #N...`) are excluded via `git log --no-merges`, since those never
+  conform and aren't meant to.
+- CONTRIBUTING.md updated: Conventional Commits is now enforced, not
+  just "preferred".
+
 ## [Unreleased] - Dependabot config
 
 ### Added

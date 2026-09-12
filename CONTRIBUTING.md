@@ -21,9 +21,17 @@
 ## Flow for a change
 
 1. Branch from `dev`: `git checkout dev && git pull && git checkout -b feature/my-change`.
-2. Commit in small, reviewable chunks. Conventional-commit-style prefixes
-   (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`) are preferred
-   but not enforced by tooling yet (see ROADMAP.md).
+2. Commit in small, reviewable chunks, using a Conventional Commits
+   prefix (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `style:`,
+   `perf:`, `build:`, `ci:`, `chore:`, `revert:`, each optionally with
+   a `(scope)` and/or a `!` for a breaking change). This is enforced,
+   not just a suggestion: `pre-commit install` (see below) sets up a
+   `commit-msg` hook that rejects a non-conforming message locally,
+   and `.github/workflows/ci.yml`'s `commit-messages` job re-checks
+   every commit in a PR so a `--no-verify`'d commit still gets caught
+   before merge. Merge commits are exempt (checked with
+   `git log --no-merges`) - only your own commit messages need to
+   conform.
 3. Before opening a PR, run `make ci` locally (lint + typecheck + tests) -
    it's the exact same three steps CI runs.
 4. Open a PR **into `dev`** (not `main`), fill in `.github/PULL_REQUEST_TEMPLATE.md`,
