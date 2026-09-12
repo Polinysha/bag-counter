@@ -1,0 +1,34 @@
+version: 2
+updates:
+  # Python dependencies. requirements/base.txt, cv.txt, dev.txt are real
+  # pip-installable files - dev.txt's `-r base.txt` / `-r cv.txt` lines
+  # are followed. requirements/ml.txt is a documentation-only pinned-
+  # version record (installed via `mim` in backend/Dockerfile, not
+  # `pip install -r` - see that file's own header comment), so it has
+  # no actual requirement lines for Dependabot to find or bump; it's
+  # kept in sync with backend/Dockerfile's ARGs by hand.
+  - package-ecosystem: "pip"
+    directory: "/backend/requirements"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "tooling"
+
+  # Base image (python:3.10-slim) and any other pinned image refs in
+  # backend/Dockerfile.
+  - package-ecosystem: "docker"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "tooling"
+
+  # Action versions pinned in .github/workflows/*.yml
+  # (actions/checkout@v4, docker/build-push-action@v5, etc.).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "tooling"

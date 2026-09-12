@@ -62,7 +62,12 @@ off here as their issue closes.
       worth fighting).
 - [ ] Enforce Conventional Commits via a commit-msg hook (referenced as
       "preferred but not enforced" in `CONTRIBUTING.md`).
-- [ ] Dependabot/renovate config for `requirements/*.txt` version bumps.
+- [x] Dependabot config - `.github/dependabot.yml` covers
+      `requirements/*.txt` (pip), `backend/Dockerfile`'s base image
+      (docker), and `.github/workflows/*.yml` action versions
+      (github-actions). `requirements/ml.txt` is documentation-only
+      (see its header comment) and has nothing for Dependabot to bump;
+      keep it in sync with `backend/Dockerfile`'s ARGs by hand.
 
 ## Explicitly out of scope for this project
 This is a computer-vision pipeline (detection -> tracking -> counting)
