@@ -11,6 +11,32 @@ on:
     branches: [dev, main]
 
 jobs:
+  commit-messages:
+    # Only meaningful on a PR (a range of new commits to check) - not
+    # on push, where the commits were already checked when their PR
+    # was open. Defense in depth for the local commit-msg hook
+    # (.pre-commit-config.yaml's conventional-pre-commit): a commit
+    # made with `git commit --no-verify`, or one from before the hook
+    # existed, still gets caught here before merge.
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check commit messages follow Conventional Commits
+        run: |
+          git fetch origin "${{ github.base_ref }}" --depth=1000
+          pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9_-]+\))?!?: .+'
+          bad=0
+          while IFS= read -r subject; do
+            if ! echo "$subject" | grep -qE "$pattern"; then
+              echo "::error::Commit message does not follow Conventional Commits: $subject"
+              bad=1
+            fi
+          done < <(git log --no-merges "origin/${{ github.base_ref }}..HEAD" --format=%s)
+          exit "$bad"
+
   lint-and-typecheck:
     runs-on: ubuntu-latest
     steps:
