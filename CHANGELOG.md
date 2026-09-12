@@ -19,6 +19,17 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 ### Changed
 - `main.py` moved from `@app.on_event("startup")` to a `lifespan` context manager.
 
+## [Unreleased] - Dependabot config
+
+### Added
+- `.github/dependabot.yml`: weekly automated update PRs for
+  `requirements/*.txt` (pip - base.txt/cv.txt/dev.txt; ml.txt is
+  documentation-only and has nothing to bump), `backend/Dockerfile`'s
+  base image (docker), and pinned versions in
+  `.github/workflows/*.yml` (github-actions). All labeled `tooling`
+  and capped at 5 open PRs for the pip ecosystem to avoid flooding the
+  issue tracker.
+
 ## [Unreleased] - mypy: disallow_untyped_defs for services/repositories
 
 ### Changed
