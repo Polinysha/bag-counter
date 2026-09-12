@@ -10,6 +10,7 @@ a gRPC endpoint, a batch script) can reuse the exact same logic.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Protocol
 
 from fastapi import UploadFile
@@ -39,7 +40,7 @@ class JobRepositoryProtocol(Protocol):
 
 
 class StorageServiceProtocol(Protocol):
-    def save_upload(self, job_id: str, file: UploadFile): ...
+    def save_upload(self, job_id: str, file: UploadFile) -> Path: ...
 
 
 class TaskQueueProtocol(Protocol):

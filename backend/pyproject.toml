@@ -43,6 +43,17 @@ check_untyped_defs = true
 module = ["cv2.*", "mmdet.*", "mmengine.*", "mmcv.*", "scipy.*", "rq.*"]
 ignore_missing_imports = true
 
+# Tightened first for the layers with the least churn and the clearest
+# contracts (service/repository interfaces, see ROADMAP.md "Typing
+# hardening") - disallow_untyped_defs here means every function in
+# these packages needs a full signature (including return type), not
+# just some parameters annotated. Extend this list module-by-module
+# rather than flipping the global default, so each step's fallout is
+# reviewable on its own.
+[[tool.mypy.overrides]]
+module = ["app.services.*", "app.repositories.*"]
+disallow_untyped_defs = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
