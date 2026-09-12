@@ -4,7 +4,7 @@
 # twice and guarantees the API and the worker always run the exact
 # same detector code/version.
 
-FROM python:3.10-slim AS base
+FROM python:3.14-slim AS base
 
 # --- system deps -----------------------------------------------------
 # libgl1/libglib2.0-0: required by opencv for video decode/encode.
