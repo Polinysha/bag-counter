@@ -28,9 +28,15 @@ off here as their issue closes.
 - [ ] Swap SQLite -> Postgres (change `sqlite_url` in `config.py` to a
       `postgresql://` URL, add a `db` service to `docker-compose.yml`) -
       needed once this runs multi-instance rather than single-node.
-- [ ] Replace status polling with Server-Sent Events / WebSocket on top
+- [x] Replace status polling with Server-Sent Events / WebSocket on top
       of the same `Job` table (`GET /api/v1/videos/{id}` stays as a
-      fallback).
+      fallback). Implemented as SSE (`GET /{id}/events`, see
+      docs/API_CONTRACTS.md) rather than WebSocket - status is
+      one-directional server -> client, so SSE's simpler HTTP-based
+      model fits without the added complexity a full-duplex WebSocket
+      would add for no benefit here. The frontend (`static/index.html`)
+      uses it by default and falls back to the original polling loop
+      if the stream can't be opened or breaks mid-way.
 - [ ] GPU image variant: CUDA torch wheel + `BC_MMDET_DEVICE=cuda:0`,
       published as a separate tag alongside the CPU image.
 - [x] CI: build & publish the full (non-lite) image on release tags,

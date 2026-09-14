@@ -19,6 +19,25 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 ### Changed
 - `main.py` moved from `@app.on_event("startup")` to a `lifespan` context manager.
 
+## [Unreleased] - SSE status stream (replaces polling)
+
+### Added
+- `GET /api/v1/videos/{job_id}/events`: Server-Sent Events alternative
+  to polling `GET /{job_id}`. Pushes a JobStatusResponse-shaped `data:`
+  frame roughly every `BC_SSE_POLL_INTERVAL_SECONDS` (default 1.0),
+  closing after the first terminal (done/failed) frame. Purely
+  additive - the polling endpoint is untouched and still works.
+- `app/static/index.html`: now uses the SSE endpoint by default
+  (parsed manually via `fetch()` + `ReadableStream`, since the
+  browser's native `EventSource` can't attach the `X-API-Key` header),
+  falling back to the original polling loop if the stream can't be
+  opened or breaks partway through.
+- 3 new integration tests for the events endpoint (404 for unknown
+  job, terminal status closes after one frame, status change produces
+  two frames then closes) - deterministic via a small scripted-response
+  fake rather than real elapsed-time races with the server's polling
+  loop.
+
 ## [Unreleased] - enforce Conventional Commits
 
 ### Added

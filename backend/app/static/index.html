@@ -128,7 +128,7 @@ document.getElementById("uploadBtn").onclick = async () => {
     document.getElementById("jobId").textContent = up.id;
     document.getElementById("resultArea").innerHTML = "";
     document.getElementById("log").textContent = "—";
-    poll(up.id);
+    track(up.id);
   } catch (err) {
     showError(err.message);
   } finally {
@@ -138,6 +138,76 @@ document.getElementById("uploadBtn").onclick = async () => {
 
 function badgeClass(status) { return status; }
 
+// Shared by both the SSE path and the polling fallback, so a status
+// update looks identical to the user regardless of which one is
+// actually driving it.
+function updateStatusUI(s, id) {
+  document.getElementById("statusBadge").textContent = s.status;
+  document.getElementById("statusBadge").className = "badge " + badgeClass(s.status);
+  document.getElementById("progress").value = s.progress_pct;
+  document.getElementById("progressText").textContent =
+    `${s.processed_frames} / ${s.total_frames ?? "?"} кадров — мешков посчитано: ${s.bag_count} — аномалий: ${s.anomalies_count}`;
+
+  if (s.status === "done") {
+    renderDownloadLink(id);
+    loadAnomalies(id);
+  }
+  if (s.status === "failed") {
+    document.getElementById("resultArea").textContent =
+      "Ошибка обработки: " + (s.error ?? "неизвестная ошибка");
+  }
+}
+
+// Primary path: a single persistent connection to GET /events (SSE)
+// instead of a client-side setInterval. Falls back to the old polling
+// loop (poll()) if the stream can't be opened at all, or breaks partway
+// through (a proxy that buffers/kills long-lived connections, a network
+// hiccup) - so status tracking never just silently stops working.
+async function track(id) {
+  clearInterval(pollTimer);
+  try {
+    await streamStatus(id);
+  } catch (err) {
+    poll(id);
+  }
+}
+
+async function streamStatus(id) {
+  // The browser's native EventSource API can't attach custom headers,
+  // so it can't carry X-API-Key - fetch() + a manually-parsed
+  // ReadableStream keeps auth consistent with every other request
+  // this page makes, at the cost of writing the (tiny) SSE frame
+  // parser ourselves.
+  const headers = {};
+  if (apiKeyInput.value) headers["X-API-Key"] = apiKeyInput.value;
+
+  const response = await fetch(`${API}/${id}/events`, { headers });
+  if (!response.ok || !response.body) {
+    throw new Error(`stream unavailable (HTTP ${response.status})`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let sepIndex;
+    while ((sepIndex = buffer.indexOf("\n\n")) !== -1) {
+      const frame = buffer.slice(0, sepIndex);
+      buffer = buffer.slice(sepIndex + 2);
+      const dataLine = frame.split("\n").find((l) => l.startsWith("data: "));
+      if (!dataLine) continue;
+      updateStatusUI(JSON.parse(dataLine.slice("data: ".length)), id);
+    }
+  }
+}
+
+// Polling fallback - only reached if streamStatus() above couldn't even
+// open the connection or it broke mid-stream.
 async function poll(id) {
   clearInterval(pollTimer);
   consecutivePollFailures = 0;
@@ -156,20 +226,9 @@ async function poll(id) {
       return;
     }
 
-    document.getElementById("statusBadge").textContent = s.status;
-    document.getElementById("statusBadge").className = "badge " + badgeClass(s.status);
-    document.getElementById("progress").value = s.progress_pct;
-    document.getElementById("progressText").textContent =
-      `${s.processed_frames} / ${s.total_frames ?? "?"} кадров — мешков посчитано: ${s.bag_count} — аномалий: ${s.anomalies_count}`;
-
-    if (s.status === "done") {
+    updateStatusUI(s, id);
+    if (s.status === "done" || s.status === "failed") {
       clearInterval(pollTimer);
-      renderDownloadLink(id);
-      loadAnomalies(id);
-    }
-    if (s.status === "failed") {
-      clearInterval(pollTimer);
-      document.getElementById("resultArea").textContent = "Ошибка обработки: " + (s.error ?? "неизвестная ошибка");
     }
   }, 1500);
 }
