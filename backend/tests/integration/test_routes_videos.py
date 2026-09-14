@@ -7,6 +7,7 @@ they still go through the full FastAPI dependency-injection + routing
 stack, unlike backend/tests/unit/*.
 """
 
+import json
 from io import BytesIO
 
 import pytest
@@ -75,6 +76,28 @@ def client():
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+class SequentialGetStatusFake:
+    """Minimal VideoService stand-in used only by the SSE tests below.
+
+    get_status() returns a pre-scripted sequence of Job snapshots, one
+    per call (holding on the last one for any extra calls beyond the
+    list's length). This sidesteps real-time race conditions between
+    test-side status mutation and the server's async polling loop -
+    the interesting behavior (each SSE frame reflects one read, the
+    stream stops at a terminal status) is fully deterministic this
+    way, independent of sleep timing.
+    """
+
+    def __init__(self, jobs: list[Job]):
+        self._jobs = jobs
+        self.calls = 0
+
+    def get_status(self, job_id: str) -> Job:
+        idx = min(self.calls, len(self._jobs) - 1)
+        self.calls += 1
+        return self._jobs[idx]
 
 
 def test_upload_returns_201_and_queued_job(client):
@@ -186,3 +209,61 @@ def test_list_videos_rejects_limit_above_max(client):
 def test_list_videos_rejects_negative_offset(client):
     resp = client.get("/api/v1/videos?offset=-1")
     assert resp.status_code == 422
+
+
+def test_events_404_for_unknown_job(client):
+    resp = client.get("/api/v1/videos/does-not-exist/events")
+    assert resp.status_code == 404
+
+
+def test_events_stream_reflects_terminal_status_and_closes(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "sse_poll_interval_seconds", 0.01)
+    job = Job(id="job-1", original_filename="clip.mp4", input_path="/x", status=JobStatus.done)
+    fake = SequentialGetStatusFake([job])
+    app.dependency_overrides[build_video_service] = lambda: fake
+    try:
+        with (
+            TestClient(app) as client,
+            client.stream("GET", "/api/v1/videos/job-1/events") as response,
+        ):
+            assert response.status_code == 200
+            assert response.headers["content-type"].startswith("text/event-stream")
+            lines = [line for line in response.iter_lines() if line]
+    finally:
+        app.dependency_overrides.clear()
+
+    assert len(lines) == 1  # terminal status -> exactly one event, then close
+    assert lines[0].startswith("data: ")
+    payload = json.loads(lines[0][len("data: ") :])
+    assert payload["status"] == "done"
+    assert payload["id"] == "job-1"
+
+
+def test_events_stream_pushes_update_when_status_changes(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "sse_poll_interval_seconds", 0.01)
+    processing = Job(
+        id="job-1", original_filename="clip.mp4", input_path="/x", status=JobStatus.processing
+    )
+    failed = Job(id="job-1", original_filename="clip.mp4", input_path="/x", status=JobStatus.failed)
+    # [existence pre-check, 1st stream read, 2nd stream read] - see
+    # stream_status() in routes_videos.py for why the pre-check exists.
+    fake = SequentialGetStatusFake([processing, processing, failed])
+    app.dependency_overrides[build_video_service] = lambda: fake
+    try:
+        with (
+            TestClient(app) as client,
+            client.stream("GET", "/api/v1/videos/job-1/events") as response,
+        ):
+            lines = [line for line in response.iter_lines() if line]
+    finally:
+        app.dependency_overrides.clear()
+
+    assert len(lines) == 2
+    first = json.loads(lines[0][len("data: ") :])
+    second = json.loads(lines[1][len("data: ") :])
+    assert first["status"] == "processing"
+    assert second["status"] == "failed"  # terminal - stream stopped here

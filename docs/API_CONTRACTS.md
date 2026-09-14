@@ -92,6 +92,21 @@ Poll job status/progress.
   ```
 * Errors: `404` unknown `job_id`.
 
+### `GET /api/v1/videos/{job_id}/events`
+
+Server-Sent Events (`text/event-stream`) alternative to polling the
+endpoint above. Purely additive - `GET /{job_id}` is unaffected and
+still works exactly as documented above.
+
+* Sends one `data: <JobStatusResponse JSON>\n\n` frame roughly every
+  1s (`BC_SSE_POLL_INTERVAL_SECONDS`, default 1.0), same shape as the
+  polling endpoint's response body.
+* Closes the connection after the first frame where `status` is
+  `done` or `failed` - a terminal job gets exactly one frame, then the
+  stream ends.
+* Errors: `404` unknown `job_id` (returned before the stream opens,
+  not as an SSE frame).
+
 ### `GET /api/v1/videos/{job_id}/anomalies`
 
 * Response `200`:

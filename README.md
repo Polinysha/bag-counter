@@ -297,8 +297,8 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the `main` / `dev` / `feature/*` br
   be fine-tuned on labeled frames from this specific conveyor, which would
   improve both counting accuracy and some anomaly signals (`unusual_size`,
   `low_confidence`).
-* Progress is served via polling; this can easily be swapped for
-  Server-Sent Events / WebSocket on top of the same `Job` table.
+* Progress is served via SSE (`GET /videos/{id}/events`) with a polling
+  fallback (`GET /videos/{id}`) - see docs/API_CONTRACTS.md.
 * A single worker by default — to process multiple videos in parallel:
   `docker compose up --scale worker=N`.
 
