@@ -26,7 +26,7 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # ghcr.io requires a lowercase image path; github.repository
       # keeps the repo's actual casing (e.g. "Polinysha/bag-counter"),
