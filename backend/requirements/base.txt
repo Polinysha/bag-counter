@@ -2,7 +2,7 @@
 # Installed in every image (full and lite/CI). No CV or ML deps here.
 fastapi==0.141.1
 uvicorn[standard]==0.30.1
-python-multipart==0.0.9   # required by FastAPI/Starlette for multipart file uploads (not imported directly)
+python-multipart==0.0.32   # required by FastAPI/Starlette for multipart file uploads (not imported directly)
 sqlmodel==0.0.19
 pydantic-settings==2.3.4
 redis==5.0.7
