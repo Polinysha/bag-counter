@@ -86,6 +86,13 @@ class Settings(BaseSettings):
     # one with: python -c "import secrets; print(secrets.token_urlsafe(32))"
     api_key: str | None = None
 
+    # --- status streaming ------------------------------------------------
+    # How often GET /videos/{id}/events (SSE) re-checks the DB and pushes
+    # an update. 1s matches the frontend's old polling interval - this
+    # is meant to feel identical from the client's perspective, just
+    # push-based instead of a client-side setInterval.
+    sse_poll_interval_seconds: float = 1.0
+
     class Config:
         env_prefix = "BC_"
 

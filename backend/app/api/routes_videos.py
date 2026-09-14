@@ -1,7 +1,13 @@
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse
+import asyncio
+import json
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
+from starlette.concurrency import run_in_threadpool
 
 from app.auth import require_api_key
+from app.config import settings
+from app.models import JobStatus
 from app.repositories.job_repository import JobNotFoundError
 from app.schemas import (
     JobAnomaliesResponse,
@@ -69,6 +75,62 @@ def get_status(job_id: str, service: VideoService = Depends(build_video_service)
     except JobNotFoundError as exc:
         raise HTTPException(404, "Job not found") from exc
     return JobStatusResponse.from_job(job)
+
+
+@router.get("/{job_id}/events")
+async def stream_status(
+    job_id: str,
+    request: Request,
+    service: VideoService = Depends(build_video_service),
+):
+    """
+    Server-Sent Events alternative to polling GET /{job_id}: pushes a
+    JobStatusResponse-shaped `data:` frame roughly every
+    BC_SSE_POLL_INTERVAL_SECONDS, stopping once the job reaches a
+    terminal status (done/failed) or the client disconnects.
+
+    This is purely additive - GET /{job_id} still works exactly as
+    before for anyone polling it - so there's nothing here for the v1
+    compatibility checklist in docs/API_CONTRACTS.md to worry about.
+
+    The DB read each tick still goes through the same synchronous
+    VideoService/JobRepository as every other route (see README "Key
+    Technical Decisions" - SQLite/SQLModel throughout); run_in_threadpool
+    keeps that blocking call from stalling the event loop for every
+    other request while this connection sits open.
+    """
+    try:
+        await run_in_threadpool(service.get_status, job_id)
+    except JobNotFoundError as exc:
+        # Fail fast with a normal 404 rather than opening a stream that
+        # would immediately have nothing to say.
+        raise HTTPException(404, "Job not found") from exc
+
+    async def event_generator():
+        while True:
+            if await request.is_disconnected():
+                break
+            try:
+                job = await run_in_threadpool(service.get_status, job_id)
+            except JobNotFoundError:
+                break
+            payload = JobStatusResponse.from_job(job).model_dump(mode="json")
+            yield f"data: {json.dumps(payload)}\n\n"
+            if job.status in (JobStatus.done, JobStatus.failed):
+                break
+            await asyncio.sleep(settings.sse_poll_interval_seconds)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            # nginx (or any buffering reverse proxy) defaults to
+            # buffering upstream responses, which would hold every SSE
+            # frame until the connection closes - defeating the point.
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get("/{job_id}/anomalies", response_model=JobAnomaliesResponse)
