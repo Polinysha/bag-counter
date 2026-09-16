@@ -25,9 +25,14 @@ off here as their issue closes.
       angles other than the supplied `input.mp4`.
 
 ## Scalability / infra
-- [ ] Swap SQLite -> Postgres (change `sqlite_url` in `config.py` to a
-      `postgresql://` URL, add a `db` service to `docker-compose.yml`) -
-      needed once this runs multi-instance rather than single-node.
+- [x] Swap SQLite -> Postgres, needed once this runs multi-instance
+      rather than single-node. Implemented as an opt-in swap, not a
+      replacement: set `BC_DATABASE_URL` (see `app/config.py`) and run
+      with `docker-compose.postgres.yml` - SQLite stays the zero-config
+      default for plain `docker compose up`. Verified against a real
+      PostgreSQL 16 instance (table creation, full JobRepository
+      round-trip) during development, not just unit-tested against the
+      URL-selection logic - see CHANGELOG.md.
 - [x] Replace status polling with Server-Sent Events / WebSocket on top
       of the same `Job` table (`GET /api/v1/videos/{id}` stays as a
       fallback). Implemented as SSE (`GET /{id}/events`, see

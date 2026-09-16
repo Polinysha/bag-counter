@@ -74,6 +74,21 @@ still needs the `redis` service and a `./data` mount to actually run; see
 `image: ghcr.io/polinysha/bag-counter:latest` there if you'd rather always
 pull than build.
 
+### Using Postgres instead of SQLite
+
+Plain `docker compose up` uses SQLite (zero extra setup — see "Key Technical
+Decisions" below). To use Postgres instead:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.postgres.yml up --build
+```
+
+This adds a `postgres` service and points `api`/`worker` at it via
+`BC_DATABASE_URL` — see `docker-compose.postgres.yml` and `.env.example`
+(`POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB`). No code or migration step
+needed either way — `SQLModel.metadata.create_all()` (`app/db.py::init_db`)
+creates the schema on startup against whichever database is configured.
+
 **First release only:** GitHub Container Registry packages default to
 *private* even in a public repo. After the first `v*.*.*` tag publishes one,
 go to the package's page (linked from the repo sidebar under "Packages") →
@@ -205,12 +220,12 @@ change `./data` to the desired path in `docker-compose.yml`.
   and survives container recreation just as well (jobs live in Redis, status
   lives in SQLite on a volume). Celery is justified when you need multiple
   queues/task routing by type, which isn't needed here.
-* **SQLite instead of Postgres** — for a single-user/single-instance test
-  task, an extra DB service brings no architectural benefit, and SQLite on a
-  volume already provides persistence across container recreation. Switching
-  to Postgres is a change to `sqlite_url` in `config.py` to a
-  `postgresql://...` URL plus adding a service to `docker-compose.yml`; the
-  rest of the code (SQLModel) doesn't change.
+* **SQLite instead of Postgres by default** — for a single-user/single-instance
+  test task, an extra DB service brings no architectural benefit, and SQLite
+  on a volume already provides persistence across container recreation.
+  Postgres is a one-flag opt-in when that stops being true: set
+  `BC_DATABASE_URL` and run with `docker-compose.postgres.yml` (see that
+  file). The rest of the code (SQLModel) doesn't change either way.
 * **A single Docker image for both `api` and `worker`** — eliminates any
   version drift between the process accepting requests and the process
   actually counting bags.

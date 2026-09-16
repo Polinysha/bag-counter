@@ -1,0 +1,40 @@
+# Optional override that swaps SQLite for Postgres. Usage:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.postgres.yml up --build
+#
+# Adds a postgres service and points api/worker at it via
+# BC_DATABASE_URL (see app/config.py "database_url"). SQLite remains
+# the default with plain `docker compose up` - this file changes
+# nothing unless explicitly included with -f.
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-bagcounter}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-bagcounter}
+      - POSTGRES_DB=${POSTGRES_DB:-bagcounter}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bagcounter}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    environment:
+      - BC_DATABASE_URL=postgresql+psycopg://${POSTGRES_USER:-bagcounter}:${POSTGRES_PASSWORD:-bagcounter}@postgres:5432/${POSTGRES_DB:-bagcounter}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    environment:
+      - BC_DATABASE_URL=postgresql+psycopg://${POSTGRES_USER:-bagcounter}:${POSTGRES_PASSWORD:-bagcounter}@postgres:5432/${POSTGRES_DB:-bagcounter}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
