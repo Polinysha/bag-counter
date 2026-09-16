@@ -15,6 +15,18 @@ class Settings(BaseSettings):
     processed_subdir: str = "processed"
     db_subdir: str = "db"
 
+    # --- database --------------------------------------------------------
+    # SQLite (sqlite_url below, computed from data_dir/db_subdir) is the
+    # zero-config default - fine for the single-node deployment this
+    # project targets (see README "Key Technical Decisions"). Set
+    # BC_DATABASE_URL to point at Postgres instead (e.g.
+    # "postgresql+psycopg://user:pass@host:5432/dbname") once running
+    # multi-instance, where SQLite's single-writer model becomes a real
+    # constraint - see docker-compose.postgres.yml for a ready-to-use
+    # override. When set, this takes over completely; sqlite_url is
+    # simply unused.
+    database_url: str | None = None
+
     # --- queue / broker ------------------------------------------------
     redis_url: str = "redis://redis:6379/0"
     queue_name: str = "video_processing"

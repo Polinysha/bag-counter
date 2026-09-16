@@ -7,3 +7,10 @@ sqlmodel==0.0.19
 pydantic-settings==2.3.4
 redis==5.0.7
 rq==2.12.0
+# Only exercised when BC_DATABASE_URL points at Postgres (see
+# app/config.py "database_url" / docker-compose.postgres.yml) - SQLite
+# needs no driver package, it's in the Python standard library. Always
+# installed anyway (like redis/rq above) rather than split into a
+# separate optional requirements file, since it's a small pure-wheel
+# package with no heavy/native build step to avoid.
+psycopg[binary]==3.2.3

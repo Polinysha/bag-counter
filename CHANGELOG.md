@@ -19,6 +19,32 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 ### Changed
 - `main.py` moved from `@app.on_event("startup")` to a `lifespan` context manager.
 
+## [Unreleased] - Postgres support (opt-in)
+
+### Added
+- `BC_DATABASE_URL` setting (`app/config.py`): when set, `app/db.py`
+  connects there instead of the SQLite default - no code changes
+  needed either way, `SQLModel.metadata.create_all()` (`init_db()`)
+  creates the schema against whichever database is configured.
+- `docker-compose.postgres.yml`: opt-in override adding a `postgres`
+  service and wiring `BC_DATABASE_URL` for `api`/`worker` - run with
+  `docker compose -f docker-compose.yml -f docker-compose.postgres.yml
+  up --build`. Plain `docker compose up` is unaffected and still uses
+  SQLite.
+- `psycopg[binary]==3.2.3` added to `requirements/base.txt` (the
+  Postgres driver; a pure-wheel package, no native build step).
+- `tests/unit/test_db.py`: 2 tests on `_engine_kwargs()` - the
+  SQLite-vs-Postgres connect-args selection logic. These don't connect
+  to a real database (CI has none available); the Postgres code path
+  itself was verified manually against a real PostgreSQL 16 instance
+  during development - table creation via `init_db()`, then a full
+  `JobRepository` round-trip (create/get/mark_queued/list_page) all
+  confirmed working, including SQLAlchemy correctly inferring a native
+  Postgres `ENUM` for `Job.status` and a native `json` column for
+  `Job.anomalies` with no manual schema work.
+- README "Using Postgres instead of SQLite", ROADMAP.md, `.env.example`
+  updated to match.
+
 ## [Unreleased] - SSE status stream (replaces polling)
 
 ### Added
